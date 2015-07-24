@@ -1,0 +1,32 @@
+<resources>
+    <declare-styleable name="SimpleExponentView">
+        <attr name="simple_exponent" format="integer" />
+        <attr name="simple_base" format="string" />
+    </declare-styleable>
+    <declare-styleable name="PolynomialElementBaseView">
+        <attr name="exponent" format="integer" />
+        <attr name="numerator" format="float" />
+        <attr name="denominator" format="float"/>
+        <attr name="show_sign" format="boolean"/>
+    </declare-styleable>
+    <declare-styleable name="AstatismView">
+        <attr name="astatism" format="integer" />
+    </declare-styleable>
+    <declare-styleable name="PolynomialChainView">
+    </declare-styleable>
+    <declare-styleable name="TransferFunctionBaseView">
+        <attr name="gain" format="float" />
+        <attr name="tf_astatism" format="integer" />
+    </declare-styleable>
+    <declare-styleable name="TransferFunctionView">
+    </declare-styleable>
+    <declare-styleable name="EditableTransferFunctionView">
+    </declare-styleable>
+    <declare-styleable name="DiagramView">
+        <attr name="background_color" format="color" />
+        <attr name="lines_color" format="color" />
+        <attr name="axis_color" format="color" />
+        <attr name="curve_color" format="color" />
+        <attr name="size_text" format="float" />
+    </declare-styleable>
+</resources>

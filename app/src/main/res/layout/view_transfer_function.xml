@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<merge xmlns:android="http://schemas.android.com/apk/res/android">
+    <LinearLayout
+        xmlns:android="http://schemas.android.com/apk/res/android"
+        android:id="@+id/tf_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/gain"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+        <view
+            android:id="@+id/astatism"
+            class="com.hrca.nyquist.customs.AstatismView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content" />
+
+        <LinearLayout
+            android:id="@+id/main_fractal"
+            android:layout_width="match_parent"
+            android:layout_height="133sp"
+            android:orientation="vertical"
+            android:padding="2dp">
+
+            <view
+                android:id="@+id/numerator_chain"
+                class="com.hrca.nyquist.customs.PolynomialChainView"
+                android:layout_width="wrap_content"
+                android:layout_height="0dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_weight="45"/>
+
+            <View
+                android:id="@+id/fraction_bar"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:background="#000"
+                android:layout_weight="1"/>
+
+            <view
+                android:id="@+id/denominator_chain"
+                class="com.hrca.nyquist.customs.PolynomialChainView"
+                android:layout_width="wrap_content"
+                android:layout_height="0dp"
+                android:layout_gravity="center_horizontal"
+                android:layout_weight="45"/>
+        </LinearLayout>
+    </LinearLayout>
+</merge>

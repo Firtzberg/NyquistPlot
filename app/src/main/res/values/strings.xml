@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <string name="app_name">Nyquist Plot</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
+    <string name="title_activity_history">History</string>
+    <string name="title_activity_polynomial">PolynomialActivity</string>
+    <string name="title_activity_result">ResultActivity</string>
+    <string name="decrease_astatism">Decrease astatism</string>
+    <string name="increase_astatism">Increase astatism</string>
+    <string name="delete_history">Delete History</string>
+    <string name="gain_zero">Gain is zero. The system has no output.</string>
+    <string name="numerator_zero">Transfer function is always zero. It has no output.</string>
+    <string name="denominator_zero">Denominator is zero. Division by zero not allowed!</string>
+</resources>

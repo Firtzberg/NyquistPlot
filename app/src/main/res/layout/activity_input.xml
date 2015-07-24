@@ -1,0 +1,87 @@
+<RelativeLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools" android:layout_width="match_parent"
+    android:layout_height="match_parent" android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    android:paddingBottom="@dimen/activity_vertical_margin" tools:context=".InputActivity">
+
+    <ImageButton
+        android:layout_width="@dimen/image_button_size"
+        android:layout_height="@dimen/image_button_size"
+        android:contentDescription="Reset"
+        android:scaleType="fitCenter"
+        android:src="@drawable/reset"
+        android:id="@+id/button"
+        android:onClick="reset"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true" />
+
+    <ImageButton
+        android:layout_width="@dimen/image_button_size"
+        android:layout_height="@dimen/image_button_size"
+        android:src="@drawable/history"
+        android:id="@+id/button3"
+        android:scaleType="fitCenter"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="true"
+        android:contentDescription="@string/delete_history"
+        android:onClick="historyClick" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@+id/button"
+        android:layout_above="@+id/button4"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true">
+
+        <view
+            android:layout_height="wrap_content"
+            android:layout_width="match_parent"
+            android:layout_alignParentLeft="true"
+            android:layout_alignParentStart="true"
+            android:layout_centerVertical="true"
+            android:layout_toLeftOf="@+id/add_btns"
+            android:layout_toStartOf="@+id/add_btns"
+            android:id="@+id/view2"
+            class="com.hrca.nyquist.customs.editablecustoms.EditableTransferFunctionView" />
+
+        <LinearLayout
+            android:id="@+id/add_btns"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentRight="true"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:orientation="vertical">
+
+            <Button
+                android:id="@+id/add_num"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="addNumeratorButtonClick"
+                android:text="*(s...)" />
+
+            <Button
+                android:id="@+id/add_denom"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:onClick="addDenominatorButtonClick"
+                android:text="*(s...)" />
+        </LinearLayout>
+    </RelativeLayout>
+
+    <ImageButton
+        android:layout_width="150dp"
+        android:layout_height="60dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="Show Bode"
+        android:src="@drawable/check"
+        android:id="@+id/button4"
+        android:layout_centerHorizontal="true"
+        android:layout_alignParentBottom="true"
+        android:onClick="nyquist" />
+</RelativeLayout>

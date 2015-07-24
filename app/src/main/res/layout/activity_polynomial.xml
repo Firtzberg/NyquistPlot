@@ -1,0 +1,49 @@
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:paddingLeft="@dimen/activity_horizontal_margin"
+    android:paddingRight="@dimen/activity_horizontal_margin"
+    android:paddingTop="@dimen/activity_vertical_margin"
+    android:paddingBottom="@dimen/activity_vertical_margin"
+    tools:context="com.hrca.nyquist.nyquistplot.PolynomialActivity">
+    <ImageButton
+        android:layout_width="@dimen/s_pow_image_button_size"
+        android:layout_height="@dimen/s_pow_image_button_size"
+        android:scaleType="fitCenter"
+        android:id="@+id/imageButton4"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentTop="true"
+        android:layout_alignParentStart="true"
+        android:onClick="add"
+        android:src="@drawable/s_to_n_plus_1"/>
+
+    <ImageButton
+        android:layout_width="@dimen/s_pow_image_button_size"
+        android:layout_height="@dimen/s_pow_image_button_size"
+        android:scaleType="fitCenter"
+        android:id="@+id/imageButton5"
+        android:layout_below="@+id/imageButton4"
+        android:layout_alignParentLeft="true"
+        android:layout_alignParentStart="true"
+        android:onClick="remove"
+        android:src="@drawable/s_to_n_minus_1" />
+
+    <view
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        class="com.hrca.nyquist.customs.editablecustoms.EditablePolynomialView"
+        android:id="@+id/polynomial"
+        android:layout_toRightOf="@+id/imageButton5"
+        android:layout_toEndOf="@+id/imageButton5"
+        android:layout_above="@+id/button6" />
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@android:string/ok"
+        android:id="@+id/button6"
+        android:onClick="done"
+        android:layout_alignParentBottom="true"
+        android:layout_centerHorizontal="true" />
+</RelativeLayout>
