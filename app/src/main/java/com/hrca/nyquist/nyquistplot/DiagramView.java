@@ -20,18 +20,12 @@ import org.ejml.data.Complex64F;
  */
 public class DiagramView extends SurfaceView {
     private static final float DENSITY_COEFFICIENT = Resources.getSystem().getDisplayMetrics().density;
-    private static final float PIXELS_PER_DECADE = 60 * DENSITY_COEFFICIENT;
-    private static final float PIXELS_PER_DB = 2.5F * DENSITY_COEFFICIENT;
-    private static final float PIXELS_PER_DEGREE = 50/90F * DENSITY_COEFFICIENT;
-    private static final float PIXELS_LEFT_PADDING = 50 * DENSITY_COEFFICIENT;
+    private static final float PIXELS_LEFT_PADDING = 20 * DENSITY_COEFFICIENT;
     private static final float PIXELS_TOP_PADDING = 20 * DENSITY_COEFFICIENT;
     private static final float PIXELS_RIGHT_PADDING = 20 * DENSITY_COEFFICIENT;
     private static final float PIXELS_BOTTOM_PADDING = 20 * DENSITY_COEFFICIENT;
-    private static final float PIXELS_BETWEEN_DIAGRAMS = 15 * DENSITY_COEFFICIENT;
     private static final double FREQUENCY_DENSITY = 20;
-    private static final float linesLength = 5;
-    private static final float AMPLITUDE_STEP_DB = 20;
-    private static final float PHASE_STEP_DEGREES = 45;
+    private static final float linesLength = 5 * DENSITY_COEFFICIENT;
     private static final int COLOR_DEFAULT_BACKGROUND = Color.WHITE;
     private static final int COLOR_DEFAULT_LINES = Color.LTGRAY;
     private static final int COLOR_DEFAULT_AXIS = Color.BLACK;
@@ -39,21 +33,19 @@ public class DiagramView extends SurfaceView {
     private static final int COLOR_DEFAULT_TEXT = Color.BLACK;
     private static final float SIZE_DEFAULT_TEXT = 12 * Resources.getSystem().getDisplayMetrics().scaledDensity;
     private static final float RELATIVE_CURVE_THICKNESS = 1.5F;
+    private float pixelsPerUnit;
     double[] numeratorVector;
     double[] denominatorVector;
     int astatism;
     private double minFrequency;
     private double maxFrequency;
-    private double minAmplitude;
-    private double maxAmplitude;
-    private double minPhase;
-    private double maxPhase;
+    private Complex64F min;
+    private Complex64F max;
     private int backgroundColor;
     private final Paint linesPaint;
     private final Paint axisPaint;
     private final Paint curvePaint;
     private final Paint textPaint;
-    private final Complex64F reusableComplex = new Complex64F();
 
     public DiagramView(Context context) {
         this(context, null);
@@ -110,79 +102,150 @@ public class DiagramView extends SurfaceView {
         new Thread(new Runnable() {
             @Override
             public void run() {
-                drawBode();
+                drawNyquist();
             }
         }).start();
     }
 
-    private void drawBode(){
+    private void drawNyquist(){
+        this.min = new Complex64F(0, 0);
+        this.max = new Complex64F(0, 0);
         long startTime = System.currentTimeMillis();
         long time = startTime;
         long end;
         double[] frequencies = getFrequencies();
-        double amplitude;
-        double[] amplitudes = new double[frequencies.length];
-        double phase;
-        double[] phases = new double[frequencies.length];
+        Complex64F[] values = new Complex64F[frequencies.length];
         Complex64F value;
-        double m;
+        Complex64F numerator = null;
+        Complex64F denominator = null;
+        double temp;
+        int a;
+
+        Complex64F zero = new Complex64F(0, 0);
+        if(astatism == 0){
+            zero.real = this.numeratorVector[0] / this.denominatorVector[0];
+            if (zero.real > max.real)
+                max.real = zero.real;
+            if (zero.real < min.real)
+                min.real = zero.real;
+        }
+        else if(astatism < 0){
+            switch (astatism % 4 + 4){
+                case 0:
+                    zero.real = Double.POSITIVE_INFINITY;
+                    break;
+                case 1:
+                    zero.imaginary = Double.NEGATIVE_INFINITY;
+                    break;
+                case 2:
+                    zero.real = Double.NEGATIVE_INFINITY;
+                    break;
+                case 3:
+                    zero.imaginary = Double.POSITIVE_INFINITY;
+                    break;
+            }
+        }
+
         for(int i = 0; i < frequencies.length; i++){
-            value = calculatePolynomialValue(frequencies[i], this.numeratorVector);
-            amplitude = value.getMagnitude();
-            phase = Math.atan2(value.imaginary, value.real);
-            value = calculatePolynomialValue(frequencies[i], this.denominatorVector);
-            m = value.getMagnitude();
-            if(m == 0) {
-                amplitude = Double.POSITIVE_INFINITY;
+            numerator = calculatePolynomialValue(frequencies[i], this.numeratorVector, numerator);
+            denominator = calculatePolynomialValue(frequencies[i], this.denominatorVector, denominator);
+            temp = denominator.getMagnitude2();
+            value = new Complex64F();
+            if(temp == 0) {
+                value.real = Double.POSITIVE_INFINITY;
             }
             else{
-                amplitude /= value.getMagnitude();
-            }
-            phase -= Math.atan2(value.imaginary, value.real);
-            phase *= 180/Math.PI;
-            amplitude *= Math.pow(frequencies[i], this.astatism);
-            phase += this.astatism * 90;
-            if(amplitude < 0) {
-                phase += 180;
-                amplitude = -amplitude;
-            }
-            phase -= Math.floor((phase + 270) / 360)*360;
+                value.real = numerator.real*denominator.real + numerator.imaginary*denominator.imaginary;
+                value.real /= temp;
+                value.imaginary = numerator.imaginary*denominator.real - numerator.real*denominator.imaginary;
+                value.imaginary /= temp;
 
-            amplitude = 20*Math.log10(amplitude);
-            if(Double.isInfinite(amplitude)){
-                amplitude = amplitudes[i-1];
-            }
-            amplitudes[i] = amplitude;
-            if(i  == 0) {
-                minAmplitude = maxAmplitude = amplitude;
-            }
-            else {
-                if (amplitude > maxAmplitude)
-                    maxAmplitude = amplitude;
-                if (amplitude < minAmplitude)
-                    minAmplitude = amplitude;
+                temp = Math.pow(frequencies[i], this.astatism);
+                value.imaginary *= temp;
+                value.real *= temp;
+
+                a = astatism % 4;
+                if(a < 0) a += 4;
+                for(; a > 0; a--){
+                    temp = value.real;
+                    value.real = -value.imaginary;
+                    value.imaginary = temp;
+                }
             }
 
-            phases[i] = phase;
-            if(phase > maxPhase)
-                maxPhase = phase;
-            if(phase < minPhase)
-                minPhase = phase;
+            if(complex64FIsInfinite(value)){
+                value = values[i-1];
+            }
 
-            frequencies[i] = Math.log10(frequencies[i]);
+            if (value.real > max.real)
+                max.real = value.real;
+            if (value.real < min.real)
+                min.real = value.real;
+            if (value.imaginary > max.imaginary)
+                max.imaginary = value.imaginary;
+            if (value.imaginary < min.imaginary)
+                min.imaginary = value.imaginary;
+
+            values[i] =value;
         }
-        this.maxAmplitude = Math.ceil(this.maxAmplitude / AMPLITUDE_STEP_DB) * AMPLITUDE_STEP_DB;
-        this.minAmplitude = Math.floor(this.minAmplitude / AMPLITUDE_STEP_DB) * AMPLITUDE_STEP_DB;
-        this.maxPhase = Math.ceil(this.maxPhase / PHASE_STEP_DEGREES) * PHASE_STEP_DEGREES;
-        this.minPhase = Math.floor(this.minPhase / PHASE_STEP_DEGREES) * PHASE_STEP_DEGREES;
+
+        Complex64F infinite = new Complex64F(0, 0);
+        a = this.astatism + this.numeratorVector.length - this.denominatorVector.length;
+        if(a > 0){
+            switch (a % 4){
+                case 0:
+                    infinite.real = Double.NEGATIVE_INFINITY;
+                    break;
+                case 1:
+                    infinite.imaginary = Double.POSITIVE_INFINITY;
+                    /*if(a == 1){
+                        infinite.real = this.numeratorVector[this.numeratorVector.length - 1]
+                            / this.denominatorVector[this.denominatorVector.length - 1];
+                    }*/
+                    break;
+                case 2:
+                    infinite.real = Double.POSITIVE_INFINITY;
+                    break;
+                case 3:
+                    infinite.imaginary = Double.NEGATIVE_INFINITY;
+                    break;
+            }
+        }else if (a == 0){
+            infinite.real = this.numeratorVector[this.numeratorVector.length - 1]
+                    / this.denominatorVector[this.denominatorVector.length - 1];
+            if (infinite.real > max.real)
+                max.real = infinite.real;
+            if (infinite.real < min.real)
+                min.real = infinite.real;
+        }
+
+        float width = (float)(max.real - min.real);
+        if(width == 0){
+            max.real = 1;
+            min.real = -1;
+            width = 2;
+        }
+        float height = (float)(max.imaginary - min.imaginary);
+        if(height == 0){
+            max.imaginary = 1;
+            min.imaginary = -1;
+            height = 2;
+        }
+        if(width > height){
+            pixelsPerUnit = 500/height;
+        }
+        else{
+            pixelsPerUnit = 500/width;
+        }
+        Log.d("P", "Pixels per unit: " + Float.toString(pixelsPerUnit));
         end = System.currentTimeMillis();
-        Log.d("Time", "Calculation time: " + Long.toString(end - time) + " milisekunds");
+        Log.d("Time", "Calculation time: " + Long.toString(end - time) + " milliseconds");
         time = end;
         View parent = (View)this.getParent();
-        this.getLayoutParams().height = (int)getPhaseY(this.minPhase) + (int)PIXELS_BOTTOM_PADDING;
-        this.getLayoutParams().width = (int)getX(this.maxFrequency) + (int)PIXELS_RIGHT_PADDING;
-        parent.getLayoutParams().height = (int)getPhaseY(this.minPhase) + (int)PIXELS_BOTTOM_PADDING;
-        parent.getLayoutParams().width = (int)getX(this.maxFrequency) + (int)PIXELS_RIGHT_PADDING;
+        this.getLayoutParams().height = (int)getY(this.min) + (int)PIXELS_BOTTOM_PADDING;
+        this.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
+        parent.getLayoutParams().height = (int)getY(this.min) + (int)PIXELS_BOTTOM_PADDING;
+        parent.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
         parent.requestLayout();
         SurfaceHolder sh = this.getHolder();
         Canvas canvas = null;
@@ -196,37 +259,25 @@ public class DiagramView extends SurfaceView {
             e.printStackTrace();
         }
         end = System.currentTimeMillis();
-        Log.d("Time", "Waiten for canvas: " + Long.toString(end - time) + " milisekunds");
+        Log.d("Time", "Waited for canvas: " + Long.toString(end - time) + " milliseconds");
         time = end;
         canvas.drawColor(backgroundColor);
-        drawAmplitudeVerticals(canvas);
+        drawVerticals(canvas);
         end = System.currentTimeMillis();
-        Log.d("Time", "Amplitudn verticals drawn in " + Long.toString(end - time) + " milisekunds");
+        Log.d("Time", "Verticals drawn in " + Long.toString(end - time) + " milliseconds");
         time = end;
-        drawAmplitudeHorizontals(canvas);
+        drawHorizontals(canvas);
         end = System.currentTimeMillis();
-        Log.d("Time", "Amplitudne horizontals drawn in " + Long.toString(end - time) + " milisekunds");
+        Log.d("Time", "Horizontals drawn in " + Long.toString(end - time) + " milliseconds");
         time = end;
-        drawAmplitudeAxis(canvas);
+        drawAxis(canvas);
         end = System.currentTimeMillis();
-        Log.d("Time", "Amplitude axises drawn in " + Long.toString(end - time) + " milisekunds");
+        Log.d("Time", "Axises drawn in " + Long.toString(end - time) + " milliseconds");
         time = end;
-        drawPhaseHorizontals(canvas);
+        drawCurve(canvas, zero, values, infinite);
         end = System.currentTimeMillis();
-        Log.d("Time", "Phase horzontals drawn in " + Long.toString(end - time) + " milisekunds");
-        time = end;
-        drawPhaseVerticals(canvas);
-        end = System.currentTimeMillis();
-        Log.d("Time", "Phase verticals drawn in " + Long.toString(end - time) + " milisekunds");
-        time = end;
-        drawPhaseAxis(canvas);
-        end = System.currentTimeMillis();
-        Log.d("Time", "Phase axises drawn in " + Long.toString(end - time) + " milisekunds");
-        time = end;
-        drawCurves(canvas, frequencies, amplitudes, phases);
-        end = System.currentTimeMillis();
-        Log.d("Time", "Curves drawn in " + Long.toString(end - time) + " milisekunds");
-        Log.d("Time", "Total drawing time " + Long.toString(end - startTime) + " milisekunds");
+        Log.d("Time", "Curves drawn in " + Long.toString(end - time) + " milliseconds");
+        Log.d("Time", "Total drawing time " + Long.toString(end - startTime) + " milliseconds");
         sh.unlockCanvasAndPost(canvas);
     }
 
@@ -241,145 +292,110 @@ public class DiagramView extends SurfaceView {
         return result;
     }
 
-    private void drawAmplitudeHorizontals(Canvas canvas){
-        float y;
+    private void drawHorizontals(Canvas canvas){
+        double span = this.max.imaginary - this.min.imaginary;
+        float order = (float)Math.pow(10, Math.floor(Math.log10(span)));
+        float step;
+        if(span < 2 * order){
+            step = 0.5F * order;
+        } else {
+            step = order;
+        }
+        float imaginary = (float)Math.ceil(this.min.imaginary/step)*step;
+
+        float width = getX(this.max) - getX(this.min);
         float x;
-        float width = getX(this.maxFrequency) - getX(this.minFrequency);
+        float y;
         float[] pts = new float[4*(int)(width/linesLength/2)];
-        float current = (int)Math.floor(this.minAmplitude/ AMPLITUDE_STEP_DB)* AMPLITUDE_STEP_DB;
-        if(current < this.minAmplitude)
-            current += AMPLITUDE_STEP_DB;
-        while(current <= this.maxAmplitude) {
-            y = getAmplitudeY(current);
-            x = getX(this.minFrequency);
-            canvas.drawText(Integer.toString((int)current) + "dB", 10, y + textPaint.getTextSize()/2, textPaint);
+
+        for(; imaginary <= this.max.imaginary; imaginary +=step){
+            y = getY(imaginary);
+            x = getX(this.min);
+            canvas.drawText(Float.toString(imaginary), getX(0) + 5, y + textPaint.getTextSize(), textPaint);
             for(int i = 0; 4*i < pts.length; i ++){
                 pts[4*i] = x += linesLength;
                 pts[4*i + 1] = y;
                 pts[4*i + 2] = x += linesLength;
                 pts[4*i + 3] = y;
             }
-            canvas.drawLines(pts, linesPaint);
-            current += AMPLITUDE_STEP_DB;
+            canvas.drawLines(pts, this.linesPaint);
         }
     }
 
-    private void drawPhaseHorizontals(Canvas canvas){
-        float y;
+    private void drawVerticals(Canvas canvas){
+        double span = this.max.real - this.min.real;
+        float order = (float)Math.pow(10, Math.floor(Math.log10(span)));
+        float step;
+        if(span < 2 * order){
+            step = 0.5F * order;
+        } else {
+            step = order;
+        }
+        float real = (float)Math.ceil(this.min.real/step)*step;
+
+        float height = getY(this.min) - getY(this.max);
         float x;
-        float width = getX(this.maxFrequency) - getX(this.minFrequency);
-        float[] pts = new float[4*(int)(width/linesLength/2)];
-        float current = (int)Math.floor(this.minPhase/ PHASE_STEP_DEGREES)* PHASE_STEP_DEGREES;
-        if(current < this.minPhase)
-            current += PHASE_STEP_DEGREES;
-        while(current <= this.maxPhase) {
-            y = getPhaseY(current);
-            x = getX(this.minFrequency);
-            canvas.drawText(Integer.toString((int)current) + "°", 10, y + textPaint.getTextSize()/2, textPaint);
+        float y;
+        float[] pts = new float[4*(int)(height/linesLength/2)];
+
+        for(; real <= this.max.real; real +=step){
+            x = getX(real);
+            y = getY(this.max);
+            canvas.drawText(Float.toString(real), x - 12, getY(0) + textPaint.getTextSize(), textPaint);
             for(int i = 0; 4*i < pts.length; i ++){
-                pts[4*i] = x += linesLength;
-                pts[4*i + 1] = y;
-                pts[4*i + 2] = x += linesLength;
-                pts[4*i + 3] = y;
+                pts[4*i] = x;
+                pts[4*i + 1] = y += linesLength;
+                pts[4*i + 2] = x;
+                pts[4*i + 3] = y += linesLength;
             }
-            canvas.drawLines(pts, linesPaint);
-            current += PHASE_STEP_DEGREES;
+            canvas.drawLines(pts, this.linesPaint);
         }
     }
 
-    private void drawAmplitudeVerticals(Canvas canvas){
-        double[] decimals = new double[]{0, Math.log10(2), Math.log10(3), Math.log10(4), Math.log10(5)};
-        double start = Math.floor(this.minFrequency);
-        double decadeStart;
-        float x;
-        float y;
-        float height = getAmplitudeY(this.minAmplitude) - getAmplitudeY(this.maxAmplitude);
-        float[] pts = new float[4*(int)(height/linesLength/2)];
-        for(double decimal : decimals){
-            decadeStart = start;
-            if(decadeStart + decimal < this.minFrequency)
-                decadeStart++;
-            while(decadeStart + decimal <= this.maxFrequency) {
-                x = getX(decadeStart + decimal);
-                y = getAmplitudeY(this.maxAmplitude);
-                if(decimal == 0){
-                    canvas.drawText("10^" + (int)decadeStart, x - 12, getAmplitudeY(this.minAmplitude) + textPaint.getTextSize(), textPaint);
-                }
-                for(int i = 0; 4*i < pts.length; i ++){
-                    pts[4*i] = x;
-                    pts[4*i + 1] = y += linesLength;
-                    pts[4*i + 2] = x;
-                    pts[4*i + 3] = y += linesLength;
-                }
-                canvas.drawLines(pts, this.linesPaint);
-                decadeStart++;
-            }
-        }
+    private void drawAxis(Canvas canvas) {
+        canvas.drawLine(getX(this.min), getY(0), getX(this.max), getY(0), this.axisPaint);
+        canvas.drawLine(getX(0), getY(this.max), getX(0), getY(this.min), this.axisPaint);
     }
 
-    private void drawPhaseVerticals(Canvas canvas){
-        double[] decimals = new double[]{0, Math.log10(2), Math.log10(3), Math.log10(4), Math.log10(5)};
-        double start = Math.floor(this.minFrequency);
-        double decadeStart;
-        float x;
-        float y;
-        float height = getPhaseY(this.minPhase) - getPhaseY(this.maxPhase);
-        float[] pts = new float[4*(int)(height/linesLength/2)];
-        for(double decimal : decimals){
-            decadeStart = start;
-            if(decadeStart + decimal < this.minFrequency)
-                decadeStart++;
-            while(decadeStart + decimal <= this.maxFrequency) {
-                x = getX(decadeStart + decimal);
-                y = getPhaseY(this.maxPhase);
-                if(decimal == 0){
-                    canvas.drawText("10^" + (int)decadeStart, x - 12, getPhaseY(0) + textPaint.getTextSize(), textPaint);
-                }
-                for(int i = 0; 4*i < pts.length; i ++){
-                    pts[4*i] = x;
-                    pts[4*i + 1] = y += linesLength;
-                    pts[4*i + 2] = x;
-                    pts[4*i + 3] = y += linesLength;
-                }
-                canvas.drawLines(pts, this.linesPaint);
-                decadeStart++;
-            }
+    private void drawCurve(Canvas canvas, Complex64F zero, Complex64F[] values, Complex64F infinite){
+        int totalPoints = values.length - 1;
+        if(!complex64FIsInfinite(zero))
+            totalPoints ++;
+        if(!complex64FIsInfinite(infinite))
+            totalPoints ++;
+        float[] points = new float[4 * totalPoints];
+
+        int pointCounter = 0;
+        if(!complex64FIsInfinite(zero)){
+            points[0] = getX(zero);
+            points[1] = getY(zero);
+            points[2] = getX(values[0]);
+            points[3] = getY(values[0]);
+            pointCounter ++;
         }
-    }
 
-    private void drawAmplitudeAxis(Canvas canvas) {
-        canvas.drawLine(getX(this.minFrequency), getAmplitudeY(this.minAmplitude), getX(this.maxFrequency), getAmplitudeY(this.minAmplitude), this.axisPaint);
-        canvas.drawLine(getX(this.minFrequency), getAmplitudeY(this.maxAmplitude), getX(this.minFrequency), getAmplitudeY(this.minAmplitude), this.axisPaint);
-    }
-
-    private void drawPhaseAxis(Canvas canvas) {
-        canvas.drawLine(getX(this.minFrequency), getPhaseY(0), getX(this.maxFrequency), getPhaseY(0), this.axisPaint);
-        canvas.drawLine(getX(this.minFrequency), getPhaseY(this.maxPhase), getX(this.minFrequency), getPhaseY(this.minPhase), this.axisPaint);
-    }
-
-    private void drawCurves(Canvas canvas, double[] frequenciesLog10, double[] amplitudes, double[] phases){
-        int length = frequenciesLog10.length - 1;
-        float[] points = new float[4*length];
-        int i;
-        points[0] = getX(frequenciesLog10[0]);
-        points[1] = getAmplitudeY(amplitudes[0]);
-        for(i = 0; i < length - 1; i ++){
-            points[4*i + 2] = points[4*i + 4] = getX(frequenciesLog10[i]);
-            points[4*i + 3] = points[4*i + 5] = getAmplitudeY(amplitudes[i]);
+        int valueCounter = 0;
+        points[4*pointCounter + 0] = getX(values[valueCounter]);
+        points[4*pointCounter + 1] = getY(values[valueCounter]);
+        for(valueCounter ++; valueCounter < values.length - 1; pointCounter ++, valueCounter ++){
+            points[4*pointCounter + 2] = points[4*pointCounter + 4] = getX(values[valueCounter]);
+            points[4*pointCounter + 3] = points[4*pointCounter + 5] = getY(values[valueCounter]);
         }
-        points[4*i + 2] = getX(frequenciesLog10[i]);
-        points[4*i + 3] = getAmplitudeY(amplitudes[i]);
-        canvas.drawLines(points, this.curvePaint);
+        points[4*pointCounter + 2] = getX(values[valueCounter]);
+        points[4*pointCounter + 3] = getY(values[valueCounter]);
 
-        points[1] = getPhaseY(phases[0]);
-        for(i = 0; i < length - 1; i ++){
-            points[4*i + 3] = points[4*i + 5] = getPhaseY(phases[i]);
+        if(!complex64FIsInfinite(infinite)){
+            pointCounter ++;
+            points[4*pointCounter + 0] = getX(values[valueCounter]);
+            points[4*pointCounter + 1] = getY(values[valueCounter]);
+            points[4*pointCounter + 2] = getX(infinite);
+            points[4*pointCounter + 3] = getY(infinite);
         }
-        points[4*i + 3] = getPhaseY(phases[i]);
+
         canvas.drawLines(points, this.curvePaint);
     }
 
-    private Complex64F calculatePolynomialValue(double frequency, double[] coefficients){
+    private Complex64F calculatePolynomialValue(double frequency, double[] coefficients, Complex64F reusableComplex){
         int index = coefficients.length - 1;
         double resultReal = coefficients[index];
         double resultImaginary = 0;
@@ -389,20 +405,31 @@ public class DiagramView extends SurfaceView {
             resultReal = -resultImaginary*frequency + coefficients[index];
             resultImaginary = tmp * frequency;
         }
-        this.reusableComplex.real = resultReal;
-        this.reusableComplex.imaginary = resultImaginary;
-        return this.reusableComplex;
+        if(reusableComplex == null){
+            return new Complex64F(resultReal, resultImaginary);
+        }
+        reusableComplex.real = resultReal;
+        reusableComplex.imaginary = resultImaginary;
+        return reusableComplex;
     }
 
-    private float getX(double frequencyLog10){
-        return (float)(frequencyLog10 - this.minFrequency)*PIXELS_PER_DECADE + PIXELS_LEFT_PADDING;
+    private float getX(double real){
+        return (float)(real - this.min.real) * pixelsPerUnit + PIXELS_LEFT_PADDING;
     }
 
-    private float getAmplitudeY(double amplitude){
-        return (float)(this.maxAmplitude - amplitude)*PIXELS_PER_DB + PIXELS_TOP_PADDING;
+    private float getY(double imaginary){
+        return (float)(this.max.imaginary - imaginary) * pixelsPerUnit + PIXELS_TOP_PADDING;
     }
 
-    private float getPhaseY(double phase){
-        return getAmplitudeY(this.minAmplitude) + (float)(this.maxPhase - phase)*PIXELS_PER_DEGREE + PIXELS_BETWEEN_DIAGRAMS;
+    private float getX(Complex64F value){
+        return getX(value.real);
+    }
+
+    private float getY(Complex64F value){
+        return getY(value.imaginary);
+    }
+
+    private static boolean complex64FIsInfinite(Complex64F complex64F){
+        return Double.isInfinite(complex64F.real) || Double.isInfinite(complex64F.imaginary);
     }
 }
