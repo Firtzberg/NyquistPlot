@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Parcelable;
+import android.widget.TextView;
 
 import com.hrca.nyquist.customs.HistoryHelper;
 import com.hrca.nyquist.customs.displaycustoms.TransferFunctionView;
@@ -16,16 +17,17 @@ import org.ejml.interfaces.decomposition.EigenDecomposition;
 import java.util.ArrayList;
 
 public class ResultActivity extends Activity {
-    public static final String PARCELABLE_FORMATTED_TF = "formattedTF";
     public static final String PARCELABLE_ORIGINAL_TF = "originalTF";
     protected TransferFunctionView originalTransferFunction;
-    protected TransferFunctionView formattedTransferFunction;
+    protected TextView zeroView;
+    protected TextView infiniteView;
     protected DiagramView diagram;
     double[] numeratorVector;
     double[] denominatorVector;
     boolean frequencyFound;
     double minFrequency;
     double maxFrequency;
+    int astatism;
 
     private class PolynomialChainParameters{
         public final ArrayList<Complex64F> roots;
@@ -47,7 +49,8 @@ public class ResultActivity extends Activity {
         setContentView(R.layout.activity_result);
 
         this.originalTransferFunction = (TransferFunctionView) findViewById(R.id.original);
-        this.formattedTransferFunction = (TransferFunctionView) findViewById(R.id.formatted);
+        this.zeroView = (TextView) findViewById(R.id.zero);
+        this.infiniteView = (TextView) findViewById(R.id.infinite);
         this.diagram = (DiagramView)findViewById(R.id.diagram);
 
         Intent request = this.getIntent();
@@ -63,7 +66,7 @@ public class ResultActivity extends Activity {
                 return;
             }
 
-            int astatism = this.originalTransferFunction.getAstatism();
+            astatism = this.originalTransferFunction.getAstatism();
             if(astatism != 0){
                 minFrequency = maxFrequency = 1;
                 frequencyFound = true;
@@ -76,7 +79,6 @@ public class ResultActivity extends Activity {
                 return;
             }
             gain *= numeratorParameters.gain;
-            this.formattedTransferFunction.addNumeratorRoots(numeratorParameters.roots);
             astatism += numeratorParameters.astatism;
             this.numeratorVector =  numeratorParameters.vector;
 
@@ -86,7 +88,6 @@ public class ResultActivity extends Activity {
                 finishWithError(R.string.denominator_zero);
                 return;
             }
-            this.formattedTransferFunction.addDenominatorRoots(denominatorParameters.roots);
             astatism -= denominatorParameters.astatism;
             gain /= denominatorParameters.gain;
             this.denominatorVector =  denominatorParameters.vector;
@@ -98,10 +99,6 @@ public class ResultActivity extends Activity {
             minFrequency = (float)Math.log10(minFrequency);
             maxFrequency = (float)Math.log10(maxFrequency);
 
-            this.formattedTransferFunction.setAstatism(astatism);
-            this.formattedTransferFunction.adjustMainFractalVisibility();
-            this.formattedTransferFunction.setGain(gain);
-
             for(int i = 0; i < this.numeratorVector.length; i ++){
                 this.numeratorVector[i] *= gain;
             }
@@ -112,7 +109,7 @@ public class ResultActivity extends Activity {
     @Override
     public void onResume(){
         super.onResume();
-        this.diagram.draw(this.formattedTransferFunction.getAstatism(),
+        this.diagram.draw(this.astatism,
                 numeratorVector, denominatorVector, minFrequency, maxFrequency);
     }
 
@@ -120,14 +117,12 @@ public class ResultActivity extends Activity {
     public void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
         savedInstanceState.putParcelable(PARCELABLE_ORIGINAL_TF, this.originalTransferFunction.onSaveInstanceState());
-        savedInstanceState.putParcelable(PARCELABLE_FORMATTED_TF, this.formattedTransferFunction.onSaveInstanceState());
     }
 
     @Override
     public void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         this.originalTransferFunction.onRestoreInstanceState(savedInstanceState.getParcelable(PARCELABLE_ORIGINAL_TF));
-        this.formattedTransferFunction.onRestoreInstanceState(savedInstanceState.getParcelable(PARCELABLE_FORMATTED_TF));
     }
 
     private void finishWithError(int messageIdentifier){
@@ -252,5 +247,30 @@ public class ResultActivity extends Activity {
         }
 
         return roots;
+    }
+
+    public void setZero(Complex64F zero){
+
+        this.zeroView.setText("H(j0) = " + format(zero));
+    }
+
+    public void setInfinite(Complex64F infinite){
+        this.infiniteView.setText("H(j∞) = " + format(infinite));
+    }
+
+    public String format(Complex64F value){
+        String s;
+        if(value.real == Double.NEGATIVE_INFINITY)
+            s = "-∞";
+        else if(value.real == Double.POSITIVE_INFINITY)
+            s = "∞";
+        else s = Double.toString(value.real).replaceAll("\\.?0*$", "");
+        if(value.imaginary < 0)
+            s += " - j";
+        else s += " + j";
+        if(Double.isInfinite(value.imaginary))
+            s += "∞";
+        else s += Double.toString(Math.abs(value.imaginary)).replaceAll("\\.?0*$", "");
+        return s;
     }
 }

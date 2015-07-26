@@ -161,6 +161,8 @@ public class DiagramView extends SurfaceView {
                     break;
             }
         }
+        ResultActivity activity = (ResultActivity)getContext();
+        activity.setZero(zero);
 
         for(int i = 0; i < frequencies.length; i++){
             numerator = calculatePolynomialValue(frequencies[i], this.numeratorVector, numerator);
@@ -227,6 +229,7 @@ public class DiagramView extends SurfaceView {
                     / this.denominatorVector[this.denominatorVector.length - 1];
             adjustBorders(infinite);
         }
+        activity.setInfinite(infinite);
 
         if(max.imaginary > -min.imaginary)
             min.imaginary = -max.imaginary;
