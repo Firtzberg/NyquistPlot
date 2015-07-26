@@ -30,6 +30,7 @@ public class DiagramView extends SurfaceView {
     private static final int COLOR_DEFAULT_AXIS = Color.BLACK;
     private static final int COLOR_DEFAULT_CURVE = Color.BLUE;
     private static final int COLOR_DEFAULT_SECONDARY_CURVE = Color.RED;
+    private static final int COLOR_DEFAULT_UNIT_CIRCLE = Color.GREEN;
     private static final int COLOR_DEFAULT_TEXT = Color.BLACK;
     private static final float SIZE_DEFAULT_TEXT = 12 * Resources.getSystem().getDisplayMetrics().scaledDensity;
     private static final float RELATIVE_CURVE_THICKNESS = 1.5F;
@@ -48,6 +49,7 @@ public class DiagramView extends SurfaceView {
     private final Paint axisPaint;
     private final Paint curvePaint;
     private final Paint secondaryCurvePaint;
+    private final Paint unitCirclePaint;
     private final Paint textPaint;
 
     public DiagramView(Context context) {
@@ -65,6 +67,9 @@ public class DiagramView extends SurfaceView {
         this.curvePaint.setStrokeWidth(RELATIVE_CURVE_THICKNESS * DENSITY_COEFFICIENT);
         this.secondaryCurvePaint = new Paint();
         this.secondaryCurvePaint.setStrokeWidth(RELATIVE_CURVE_THICKNESS * DENSITY_COEFFICIENT);
+        this.unitCirclePaint = new Paint();
+        this.unitCirclePaint.setStrokeWidth(DENSITY_COEFFICIENT);
+        this.unitCirclePaint.setStyle(Paint.Style.STROKE);
         this.textPaint = new Paint();
         this.textPaint.setStrokeWidth(DENSITY_COEFFICIENT);
 
@@ -79,6 +84,7 @@ public class DiagramView extends SurfaceView {
         int axisColor;
         int curveColor;
         int secondaryCurveColor;
+        int unitCircleColor;
         int linesColor;
         int textColor;
         float textSize;
@@ -88,6 +94,7 @@ public class DiagramView extends SurfaceView {
             axisColor = a.getColor(R.styleable.DiagramView_axis_color, COLOR_DEFAULT_AXIS);
             curveColor = a.getColor(R.styleable.DiagramView_curve_color, COLOR_DEFAULT_CURVE);
             secondaryCurveColor = a.getColor(R.styleable.DiagramView_secondary_curve_color, COLOR_DEFAULT_SECONDARY_CURVE);
+            unitCircleColor = a.getColor(R.styleable.DiagramView_unit_circle_color, COLOR_DEFAULT_UNIT_CIRCLE);
             textColor = a.getColor(R.styleable.DiagramView_curve_color, COLOR_DEFAULT_TEXT);
             textSize = a.getFloat(R.styleable.DiagramView_size_text, SIZE_DEFAULT_TEXT);
         } finally {
@@ -97,6 +104,7 @@ public class DiagramView extends SurfaceView {
         this.axisPaint.setColor(axisColor);
         this.curvePaint.setColor(curveColor);
         this.secondaryCurvePaint.setColor(secondaryCurveColor);
+        this.unitCirclePaint.setColor(unitCircleColor);
         this.textPaint.setColor(textColor);
         this.textPaint.setTextSize(textSize);
     }
@@ -186,8 +194,6 @@ public class DiagramView extends SurfaceView {
         }
 
         temp = FREQUENCY_LOG_EXPANSION * FREQUENCY_DENSITY / 2;
-        Log.d("D", Double.toString(temp));
-        Log.d("D2", Double.toString(frequencies.length));
         for(int i = (int)temp; i < frequencies.length - temp; i ++){
             adjustBorders(values[i]);
         }
@@ -275,6 +281,7 @@ public class DiagramView extends SurfaceView {
         Log.d("Time", "Waited for canvas: " + Long.toString(end - time) + " milliseconds");
         time = end;
         canvas.drawColor(backgroundColor);
+        canvas.drawCircle(getX(0), getY(0), pixelsPerUnit, unitCirclePaint);
         drawVerticals(canvas);
         end = System.currentTimeMillis();
         Log.d("Time", "Verticals drawn in " + Long.toString(end - time) + " milliseconds");
