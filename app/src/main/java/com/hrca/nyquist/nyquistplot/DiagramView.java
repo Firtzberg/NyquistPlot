@@ -24,15 +24,17 @@ public class DiagramView extends SurfaceView {
     private static final float PIXELS_TOP_PADDING = 20 * DENSITY_COEFFICIENT;
     private static final float PIXELS_RIGHT_PADDING = 20 * DENSITY_COEFFICIENT;
     private static final float PIXELS_BOTTOM_PADDING = 20 * DENSITY_COEFFICIENT;
-    private static final double FREQUENCY_DENSITY = 20;
     private static final float linesLength = 5 * DENSITY_COEFFICIENT;
     private static final int COLOR_DEFAULT_BACKGROUND = Color.WHITE;
     private static final int COLOR_DEFAULT_LINES = Color.LTGRAY;
     private static final int COLOR_DEFAULT_AXIS = Color.BLACK;
     private static final int COLOR_DEFAULT_CURVE = Color.BLUE;
+    private static final int COLOR_DEFAULT_SECONDARY_CURVE = Color.RED;
     private static final int COLOR_DEFAULT_TEXT = Color.BLACK;
     private static final float SIZE_DEFAULT_TEXT = 12 * Resources.getSystem().getDisplayMetrics().scaledDensity;
     private static final float RELATIVE_CURVE_THICKNESS = 1.5F;
+    private static final double FREQUENCY_DENSITY = 20;
+    private static final double FREQUENCY_LOG_EXPANSION = 1.0;
     private float pixelsPerUnit;
     double[] numeratorVector;
     double[] denominatorVector;
@@ -45,6 +47,7 @@ public class DiagramView extends SurfaceView {
     private final Paint linesPaint;
     private final Paint axisPaint;
     private final Paint curvePaint;
+    private final Paint secondaryCurvePaint;
     private final Paint textPaint;
 
     public DiagramView(Context context) {
@@ -60,6 +63,8 @@ public class DiagramView extends SurfaceView {
         this.axisPaint.setStrokeWidth(DENSITY_COEFFICIENT);
         this.curvePaint = new Paint();
         this.curvePaint.setStrokeWidth(RELATIVE_CURVE_THICKNESS * DENSITY_COEFFICIENT);
+        this.secondaryCurvePaint = new Paint();
+        this.secondaryCurvePaint.setStrokeWidth(RELATIVE_CURVE_THICKNESS * DENSITY_COEFFICIENT);
         this.textPaint = new Paint();
         this.textPaint.setStrokeWidth(DENSITY_COEFFICIENT);
 
@@ -73,6 +78,7 @@ public class DiagramView extends SurfaceView {
                 0, 0);
         int axisColor;
         int curveColor;
+        int secondaryCurveColor;
         int linesColor;
         int textColor;
         float textSize;
@@ -81,6 +87,7 @@ public class DiagramView extends SurfaceView {
             linesColor = a.getColor(R.styleable.DiagramView_lines_color, COLOR_DEFAULT_LINES);
             axisColor = a.getColor(R.styleable.DiagramView_axis_color, COLOR_DEFAULT_AXIS);
             curveColor = a.getColor(R.styleable.DiagramView_curve_color, COLOR_DEFAULT_CURVE);
+            secondaryCurveColor = a.getColor(R.styleable.DiagramView_secondary_curve_color, COLOR_DEFAULT_SECONDARY_CURVE);
             textColor = a.getColor(R.styleable.DiagramView_curve_color, COLOR_DEFAULT_TEXT);
             textSize = a.getFloat(R.styleable.DiagramView_size_text, SIZE_DEFAULT_TEXT);
         } finally {
@@ -89,6 +96,7 @@ public class DiagramView extends SurfaceView {
         this.linesPaint.setColor(linesColor);
         this.axisPaint.setColor(axisColor);
         this.curvePaint.setColor(curveColor);
+        this.secondaryCurvePaint.setColor(secondaryCurveColor);
         this.textPaint.setColor(textColor);
         this.textPaint.setTextSize(textSize);
     }
@@ -97,8 +105,8 @@ public class DiagramView extends SurfaceView {
         this.astatism = astatism;
         this.numeratorVector = numeratorVector;
         this.denominatorVector = denominatorVector;
-        this.minFrequency = minFrequency - 1;
-        this.maxFrequency = maxFrequency + 1;
+        this.minFrequency = minFrequency - FREQUENCY_LOG_EXPANSION;
+        this.maxFrequency = maxFrequency + FREQUENCY_LOG_EXPANSION;
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -124,10 +132,7 @@ public class DiagramView extends SurfaceView {
         Complex64F zero = new Complex64F(0, 0);
         if(astatism == 0){
             zero.real = this.numeratorVector[0] / this.denominatorVector[0];
-            if (zero.real > max.real)
-                max.real = zero.real;
-            if (zero.real < min.real)
-                min.real = zero.real;
+            adjustBorders(zero);
         }
         else if(astatism < 0){
             switch (astatism % 4 + 4){
@@ -177,16 +182,14 @@ public class DiagramView extends SurfaceView {
                 value = values[i-1];
             }
 
-            if (value.real > max.real)
-                max.real = value.real;
-            if (value.real < min.real)
-                min.real = value.real;
-            if (value.imaginary > max.imaginary)
-                max.imaginary = value.imaginary;
-            if (value.imaginary < min.imaginary)
-                min.imaginary = value.imaginary;
-
             values[i] =value;
+        }
+
+        temp = FREQUENCY_LOG_EXPANSION * FREQUENCY_DENSITY / 2;
+        Log.d("D", Double.toString(temp));
+        Log.d("D2", Double.toString(frequencies.length));
+        for(int i = (int)temp; i < frequencies.length - temp; i ++){
+            adjustBorders(values[i]);
         }
 
         Complex64F infinite = new Complex64F(0, 0);
@@ -213,23 +216,33 @@ public class DiagramView extends SurfaceView {
         }else if (a == 0){
             infinite.real = this.numeratorVector[this.numeratorVector.length - 1]
                     / this.denominatorVector[this.denominatorVector.length - 1];
-            if (infinite.real > max.real)
-                max.real = infinite.real;
-            if (infinite.real < min.real)
-                min.real = infinite.real;
+            adjustBorders(infinite);
         }
 
+        if(max.imaginary > -min.imaginary)
+            min.imaginary = -max.imaginary;
+        if(min.imaginary < -max.imaginary)
+            max.imaginary = -min.imaginary;
+
         float width = (float)(max.real - min.real);
-        if(width == 0){
+        float height = (float)(max.imaginary - min.imaginary);
+        if(width == 0 && height == 0){
             max.real = 1;
             min.real = -1;
-            width = 2;
-        }
-        float height = (float)(max.imaginary - min.imaginary);
-        if(height == 0){
             max.imaginary = 1;
             min.imaginary = -1;
-            height = 2;
+        }
+        else {
+            if(width == 0){
+                max.real = height/2;
+                min.real = -height/2;
+                width = 2;
+            }
+            if(height == 0){
+                max.imaginary = width/2;
+                min.imaginary = width/2;
+                height = 2;
+            }
         }
         if(width > height){
             pixelsPerUnit = 500/height;
@@ -393,6 +406,13 @@ public class DiagramView extends SurfaceView {
         }
 
         canvas.drawLines(points, this.curvePaint);
+
+        float axis = getY(0);
+        for(pointCounter = 0; pointCounter < totalPoints; pointCounter ++){
+            points[4*pointCounter + 1] = 2 * axis - points[4*pointCounter + 1];
+            points[4*pointCounter + 3] = 2 * axis - points[4*pointCounter + 3];
+        }
+        canvas.drawLines(points, this.secondaryCurvePaint);
     }
 
     private Complex64F calculatePolynomialValue(double frequency, double[] coefficients, Complex64F reusableComplex){
@@ -431,5 +451,16 @@ public class DiagramView extends SurfaceView {
 
     private static boolean complex64FIsInfinite(Complex64F complex64F){
         return Double.isInfinite(complex64F.real) || Double.isInfinite(complex64F.imaginary);
+    }
+
+    private void adjustBorders(Complex64F value){
+        if (value.real > max.real)
+            max.real = value.real;
+        if (value.real < min.real)
+            min.real = value.real;
+        if (value.imaginary > max.imaginary)
+            max.imaginary = value.imaginary;
+        if (value.imaginary < min.imaginary)
+            min.imaginary = value.imaginary;
     }
 }
