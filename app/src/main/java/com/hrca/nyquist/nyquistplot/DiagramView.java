@@ -206,22 +206,42 @@ public class DiagramView extends SurfaceView {
         Complex64F infinite = new Complex64F(0, 0);
         a = this.astatism + this.numeratorVector.length - this.denominatorVector.length;
         if(a > 0){
+            double first = this.numeratorVector[this.numeratorVector.length - 1];
+            temp = 0;
+            if(this.numeratorVector.length > 1)
+                temp = this.numeratorVector[this.numeratorVector.length - 2];
             switch (a % 4){
                 case 0:
-                    infinite.real = Double.NEGATIVE_INFINITY;
+                    infinite.real = first * Double.POSITIVE_INFINITY;
+                    if(temp == 0)
+                        infinite.imaginary = 0;
+                    else
+                        infinite.imaginary = temp * Double.NEGATIVE_INFINITY;
                     break;
                 case 1:
-                    infinite.imaginary = Double.POSITIVE_INFINITY;
-                    /*if(a == 1){
-                        infinite.real = this.numeratorVector[this.numeratorVector.length - 1]
+                    infinite.imaginary = first * Double.POSITIVE_INFINITY;
+                    if(a == 1){
+                        infinite.real = this.numeratorVector[this.numeratorVector.length - 2]
                             / this.denominatorVector[this.denominatorVector.length - 1];
-                    }*/
+                    }
+                    else if(temp == 0)
+                        infinite.real = 0;
+                    else
+                        infinite.real = temp * Double.POSITIVE_INFINITY;
                     break;
                 case 2:
-                    infinite.real = Double.POSITIVE_INFINITY;
+                    infinite.real = first * Double.NEGATIVE_INFINITY;
+                    if(temp == 0)
+                        infinite.imaginary = 0;
+                    else
+                        infinite.imaginary = temp * Double.POSITIVE_INFINITY;
                     break;
                 case 3:
                     infinite.imaginary = Double.NEGATIVE_INFINITY;
+                    if(temp == 0)
+                        infinite.real = 0;
+                    else
+                        infinite.real = temp * Double.NEGATIVE_INFINITY;
                     break;
             }
         }else if (a == 0){

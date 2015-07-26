@@ -211,6 +211,9 @@ public class ResultActivity extends Activity {
             formerCoefficients = Tmp;
         }
 
+        for(i = 0; i < coefficients.length; i ++)
+            coefficients[i] /= gainChange;
+
         return new PolynomialChainParameters(roots, coefficients, gainChange, astatismChange);
     }
 
@@ -264,13 +267,13 @@ public class ResultActivity extends Activity {
             s = "-∞";
         else if(value.real == Double.POSITIVE_INFINITY)
             s = "∞";
-        else s = Double.toString(value.real).replaceAll("\\.?0*$", "");
+        else s = Float.toString((float)value.real).replaceAll("\\.?0*$", "");
         if(value.imaginary < 0)
             s += " - j";
         else s += " + j";
         if(Double.isInfinite(value.imaginary))
             s += "∞";
-        else s += Double.toString(Math.abs(value.imaginary)).replaceAll("\\.?0*$", "");
+        else s += Float.toString((float) Math.abs(value.imaginary)).replaceAll("\\.?0*$", "");
         return s;
     }
 }
