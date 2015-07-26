@@ -45,6 +45,7 @@ public class DiagramView extends SurfaceView {
     private Complex64F min;
     private Complex64F max;
     private int backgroundColor;
+    private final Paint backgroundPaint;
     private final Paint linesPaint;
     private final Paint axisPaint;
     private final Paint curvePaint;
@@ -59,6 +60,7 @@ public class DiagramView extends SurfaceView {
     public DiagramView(Context context, AttributeSet attrs) {
         super(context, attrs);
 
+        this.backgroundPaint = new Paint();
         this.linesPaint = new Paint();
         this.linesPaint.setStrokeWidth(DENSITY_COEFFICIENT);
         this.axisPaint = new Paint();
@@ -100,6 +102,7 @@ public class DiagramView extends SurfaceView {
         } finally {
             a.recycle();
         }
+        this.backgroundPaint.setColor(this.backgroundColor);
         this.linesPaint.setColor(linesColor);
         this.axisPaint.setColor(axisColor);
         this.curvePaint.setColor(curveColor);
@@ -231,32 +234,39 @@ public class DiagramView extends SurfaceView {
             max.imaginary = -min.imaginary;
 
         float width = (float)(max.real - min.real);
+        max.real += width*0.05F;
+        min.real -= width*0.05F;
+        width *= 1.1F;
         float height = (float)(max.imaginary - min.imaginary);
+        max.imaginary += height*0.05F;
+        min.imaginary -= height*0.05F;
+        height *= 1.1F;
         if(width == 0 && height == 0){
-            max.real = 1;
-            min.real = -1;
-            max.imaginary = 1;
-            min.imaginary = -1;
+            max.real = max.imaginary = 1;
+            min.real = min.imaginary = -1;
+            width = height = 2;
         }
         else {
             if(width == 0){
                 max.real = height/2;
                 min.real = -height/2;
-                width = 2;
+                width = height;
             }
             if(height == 0){
                 max.imaginary = width/2;
-                min.imaginary = width/2;
-                height = 2;
+                min.imaginary = -width/2;
+                height = width;
             }
         }
+        a = getContext().getResources().getDisplayMetrics().widthPixels;
+        a -= PIXELS_LEFT_PADDING + PIXELS_RIGHT_PADDING;
+        a -= 2 * getResources().getDimension(R.dimen.activity_horizontal_margin);
         if(width > height){
-            pixelsPerUnit = 500/height;
+            pixelsPerUnit = a/height;
         }
         else{
-            pixelsPerUnit = 500/width;
+            pixelsPerUnit = a/width;
         }
-        Log.d("P", "Pixels per unit: " + Float.toString(pixelsPerUnit));
         end = System.currentTimeMillis();
         Log.d("Time", "Calculation time: " + Long.toString(end - time) + " milliseconds");
         time = end;
@@ -267,7 +277,7 @@ public class DiagramView extends SurfaceView {
         parent.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
         parent.requestLayout();
         SurfaceHolder sh = this.getHolder();
-        Canvas canvas = null;
+        Canvas canvas;
         Log.d("Meanwhile", "Waiting for canvas");
         try {
             Thread.sleep(20);
@@ -276,27 +286,18 @@ public class DiagramView extends SurfaceView {
             }
         } catch (InterruptedException e) {
             e.printStackTrace();
+            return;
         }
         end = System.currentTimeMillis();
         Log.d("Time", "Waited for canvas: " + Long.toString(end - time) + " milliseconds");
-        time = end;
         canvas.drawColor(backgroundColor);
         canvas.drawCircle(getX(0), getY(0), pixelsPerUnit, unitCirclePaint);
         drawVerticals(canvas);
-        end = System.currentTimeMillis();
-        Log.d("Time", "Verticals drawn in " + Long.toString(end - time) + " milliseconds");
-        time = end;
         drawHorizontals(canvas);
-        end = System.currentTimeMillis();
-        Log.d("Time", "Horizontals drawn in " + Long.toString(end - time) + " milliseconds");
-        time = end;
         drawAxis(canvas);
-        end = System.currentTimeMillis();
-        Log.d("Time", "Axises drawn in " + Long.toString(end - time) + " milliseconds");
-        time = end;
         drawCurve(canvas, zero, values, infinite);
+        cover(canvas);
         end = System.currentTimeMillis();
-        Log.d("Time", "Curves drawn in " + Long.toString(end - time) + " milliseconds");
         Log.d("Time", "Total drawing time " + Long.toString(end - startTime) + " milliseconds");
         sh.unlockCanvasAndPost(canvas);
     }
@@ -314,12 +315,21 @@ public class DiagramView extends SurfaceView {
 
     private void drawHorizontals(Canvas canvas){
         double span = this.max.imaginary - this.min.imaginary;
-        float order = (float)Math.pow(10, Math.floor(Math.log10(span)));
+        int order = (int)Math.floor(Math.log10(span));
+        double base = 1;
+        if(order > 0)
+            for(int i = 0; i < order; i ++)
+                base *= 10;
+        else {
+            order = -order;
+            for (int i = 0; i < order; i++)
+                base /= 10;
+        }
         float step;
-        if(span < 2 * order){
-            step = 0.5F * order;
+        if(span < 2 * base){
+            step = 0.5F * (float)base;
         } else {
-            step = order;
+            step = (float)base;
         }
         float imaginary = (float)Math.ceil(this.min.imaginary/step)*step;
 
@@ -328,14 +338,17 @@ public class DiagramView extends SurfaceView {
         float y;
         float[] pts = new float[4*(int)(width/linesLength/2)];
 
-        for(; imaginary <= this.max.imaginary; imaginary +=step){
+        x = getX(this.min);
+        for(int i = 0; 4*i < pts.length; i ++){
+            pts[4*i] = x += linesLength;
+            pts[4*i + 2] = x += linesLength;
+        }
+
+        for(; imaginary <= this.max.imaginary; imaginary += step) {
             y = getY(imaginary);
-            x = getX(this.min);
-            canvas.drawText(Float.toString(imaginary), getX(0) + 5, y + textPaint.getTextSize(), textPaint);
+            canvas.drawText(Float.toString(imaginary).replaceAll("\\.?0*$", ""), getX(0) + 12, y + textPaint.getTextSize(), textPaint);
             for(int i = 0; 4*i < pts.length; i ++){
-                pts[4*i] = x += linesLength;
                 pts[4*i + 1] = y;
-                pts[4*i + 2] = x += linesLength;
                 pts[4*i + 3] = y;
             }
             canvas.drawLines(pts, this.linesPaint);
@@ -344,12 +357,21 @@ public class DiagramView extends SurfaceView {
 
     private void drawVerticals(Canvas canvas){
         double span = this.max.real - this.min.real;
-        float order = (float)Math.pow(10, Math.floor(Math.log10(span)));
+        int order = (int)Math.floor(Math.log10(span));
+        double base = 1;
+        if(order > 0)
+            for(int i = 0; i < order; i ++)
+                base *= 10;
+        else {
+            order = -order;
+            for (int i = 0; i < order; i++)
+                base /= 10;
+        }
         float step;
-        if(span < 2 * order){
-            step = 0.5F * order;
+        if(span < 2 * base){
+            step = 0.5F * (float)base;
         } else {
-            step = order;
+            step = (float)base;
         }
         float real = (float)Math.ceil(this.min.real/step)*step;
 
@@ -358,15 +380,18 @@ public class DiagramView extends SurfaceView {
         float y;
         float[] pts = new float[4*(int)(height/linesLength/2)];
 
-        for(; real <= this.max.real; real +=step){
+        y = getY(this.max);
+        for(int i = 0; 4*i < pts.length; i ++){
+            pts[4*i + 1] = y += linesLength;
+            pts[4*i + 3] = y += linesLength;
+        }
+
+        for(; real <= this.max.real; real += step){
             x = getX(real);
-            y = getY(this.max);
-            canvas.drawText(Float.toString(real), x - 12, getY(0) + textPaint.getTextSize(), textPaint);
+            canvas.drawText(Float.toString(real).replaceAll("\\.?0*$", ""), x + 12, getY(0) + textPaint.getTextSize(), textPaint);
             for(int i = 0; 4*i < pts.length; i ++){
                 pts[4*i] = x;
-                pts[4*i + 1] = y += linesLength;
                 pts[4*i + 2] = x;
-                pts[4*i + 3] = y += linesLength;
             }
             canvas.drawLines(pts, this.linesPaint);
         }
@@ -375,6 +400,13 @@ public class DiagramView extends SurfaceView {
     private void drawAxis(Canvas canvas) {
         canvas.drawLine(getX(this.min), getY(0), getX(this.max), getY(0), this.axisPaint);
         canvas.drawLine(getX(0), getY(this.max), getX(0), getY(this.min), this.axisPaint);
+    }
+
+    private void cover(Canvas canvas){
+        canvas.drawRect(0, 0, PIXELS_LEFT_PADDING, getY(min), this.backgroundPaint);
+        canvas.drawRect(0, 0, getX(max), PIXELS_TOP_PADDING, this.backgroundPaint);
+        canvas.drawRect(0, getY(min), getX(max) + PIXELS_RIGHT_PADDING, getY(min) + PIXELS_BOTTOM_PADDING, this.backgroundPaint);
+        canvas.drawRect(getX(max), 0, this.getLayoutParams().width, this.getLayoutParams().height, this.backgroundPaint);
     }
 
     private void drawCurve(Canvas canvas, Complex64F zero, Complex64F[] values, Complex64F infinite){
