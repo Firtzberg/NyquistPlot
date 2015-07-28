@@ -18,12 +18,12 @@ import java.util.ArrayList;
 
 public class ResultActivity extends Activity {
     public static final String PARCELABLE_ORIGINAL_TF = "originalTF";
+    private static final double FREQUENCY_DENSITY = 20;
+    private static final double FREQUENCY_LOG_EXPANSION = 1.0;
     protected TransferFunctionView originalTransferFunction;
     protected TextView zeroView;
     protected TextView infiniteView;
     protected DiagramView diagram;
-    double[] numeratorVector;
-    double[] denominatorVector;
     boolean frequencyFound;
     double minFrequency;
     double maxFrequency;
@@ -80,7 +80,6 @@ public class ResultActivity extends Activity {
             }
             gain *= numeratorParameters.gain;
             astatism += numeratorParameters.astatism;
-            this.numeratorVector =  numeratorParameters.vector;
 
             PolynomialChainParameters denominatorParameters =
                     AnalysePolynomialChain(this.originalTransferFunction.getDenominatorCoefficientArrays());
@@ -90,39 +89,49 @@ public class ResultActivity extends Activity {
             }
             astatism -= denominatorParameters.astatism;
             gain /= denominatorParameters.gain;
-            this.denominatorVector =  denominatorParameters.vector;
 
             if(!frequencyFound){
                 minFrequency = maxFrequency = 1;
             }
 
-            minFrequency = (float)Math.log10(minFrequency);
-            maxFrequency = (float)Math.log10(maxFrequency);
+            minFrequency = (float)Math.log10(minFrequency) - FREQUENCY_LOG_EXPANSION;
+            maxFrequency = (float)Math.log10(maxFrequency) + FREQUENCY_LOG_EXPANSION;
 
-            for(int i = 0; i < this.numeratorVector.length; i ++){
-                this.numeratorVector[i] *= gain;
+            for(int i = 0; i < numeratorParameters.vector.length; i ++){
+                numeratorParameters.vector[i] *= gain;
             }
             HistoryHelper.add(this.originalTransferFunction);
+
+            double[] frequencies = getFrequencies();
+            Complex64F[] values = new Complex64F[frequencies.length];
+
+            Complex64F zero = calculateZero(astatism, numeratorParameters.vector, denominatorParameters.vector);
+            this.zeroView.setText("H(j0) = " + format(zero));
+
+            for(int i = 0; i < values.length; i++){
+                values[i] = calculateTFValue(astatism, numeratorParameters.vector, denominatorParameters.vector, frequencies[i]);
+
+                if(complex64FIsInfinite(values[i])){
+                    values[i] = values[i-1];
+                }
+            }
+
+            Complex64F infinite = calculateInfinite(astatism, numeratorParameters.vector, denominatorParameters.vector);
+            this.infiniteView.setText("H(j∞) = " + format(infinite));
+
+            this.diagram.setPoints(zero, values, infinite);
         }
     }
 
     @Override
     public void onResume(){
         super.onResume();
-        this.diagram.draw(this.astatism,
-                numeratorVector, denominatorVector, minFrequency, maxFrequency);
-    }
-
-    @Override
-    public void onSaveInstanceState(Bundle savedInstanceState) {
-        super.onSaveInstanceState(savedInstanceState);
-        savedInstanceState.putParcelable(PARCELABLE_ORIGINAL_TF, this.originalTransferFunction.onSaveInstanceState());
-    }
-
-    @Override
-    public void onRestoreInstanceState(Bundle savedInstanceState) {
-        super.onRestoreInstanceState(savedInstanceState);
-        this.originalTransferFunction.onRestoreInstanceState(savedInstanceState.getParcelable(PARCELABLE_ORIGINAL_TF));
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                ResultActivity.this.diagram.redraw();
+            }
+        }).start();
     }
 
     private void finishWithError(int messageIdentifier){
@@ -130,6 +139,17 @@ public class ResultActivity extends Activity {
         myIntent.putExtra(InputActivity.EXTRA_DISPLAY_ERROR_MESSAGE_R_ID, messageIdentifier);
         this.setResult(RESULT_OK, myIntent);
         this.finish();
+    }
+
+    private double[] getFrequencies(){
+        double step = 1/FREQUENCY_DENSITY;
+        int total = (int)((maxFrequency - minFrequency)*FREQUENCY_DENSITY) + 1;
+        double[] result = new double[total];
+        double current = minFrequency;
+        for(int i = 0 ; i < total; i++, current += step){
+            result[i] = Math.pow(10, current);
+        }
+        return result;
     }
 
     private PolynomialChainParameters AnalysePolynomialChain(double[][] coefficientArrays) {
@@ -252,13 +272,129 @@ public class ResultActivity extends Activity {
         return roots;
     }
 
-    public void setZero(Complex64F zero){
-
-        this.zeroView.setText("H(j0) = " + format(zero));
+    private static Complex64F calculatePolynomialValue(double frequency, double[] coefficients){
+        int index = coefficients.length - 1;
+        double resultReal = coefficients[index];
+        double resultImaginary = 0;
+        double tmp;
+        for (index --; index >= 0; index --) {
+            tmp = resultReal;
+            resultReal = -resultImaginary*frequency + coefficients[index];
+            resultImaginary = tmp * frequency;
+        }
+        return new Complex64F(resultReal, resultImaginary);
     }
 
-    public void setInfinite(Complex64F infinite){
-        this.infiniteView.setText("H(j∞) = " + format(infinite));
+    public static Complex64F calculateZero(int astatism, double[] numeratorVector, double[] denominatorVector){
+        Complex64F zero = new Complex64F(0, 0);
+        if(astatism == 0){
+            zero.real = numeratorVector[0] / denominatorVector[0];
+        }
+        else if(astatism < 0){
+            switch (astatism % 4 + 4){
+                case 0:
+                    zero.real = Double.POSITIVE_INFINITY;
+                    break;
+                case 1:
+                    zero.imaginary = Double.NEGATIVE_INFINITY;
+                    break;
+                case 2:
+                    zero.real = Double.NEGATIVE_INFINITY;
+                    break;
+                case 3:
+                    zero.imaginary = Double.POSITIVE_INFINITY;
+                    break;
+            }
+        }
+        return zero;
+    }
+
+    public static Complex64F calculateInfinite(int astatism, double[] numeratorVector, double[] denominatorVector) {
+        Complex64F infinite = new Complex64F(0, 0);
+        int a = astatism + numeratorVector.length - denominatorVector.length;
+        if(a > 0){
+            double first = numeratorVector[numeratorVector.length - 1];
+            double temp = 0;
+            if(numeratorVector.length > 1)
+                temp = numeratorVector[numeratorVector.length - 2];
+            switch (a % 4){
+                case 0:
+                    infinite.real = first * Double.POSITIVE_INFINITY;
+                    if(temp == 0)
+                        infinite.imaginary = 0;
+                    else
+                        infinite.imaginary = temp * Double.NEGATIVE_INFINITY;
+                    break;
+                case 1:
+                    infinite.imaginary = first * Double.POSITIVE_INFINITY;
+                    if(a == 1){
+                        if(numeratorVector.length > 1) {
+                            infinite.real = numeratorVector[numeratorVector.length - 2]
+                                    / denominatorVector[denominatorVector.length - 1];
+                        } else{
+                            infinite.real = 0;
+                        }
+                    }
+                    else if(temp == 0)
+                        infinite.real = 0;
+                    else
+                        infinite.real = temp * Double.POSITIVE_INFINITY;
+                    break;
+                case 2:
+                    infinite.real = first * Double.NEGATIVE_INFINITY;
+                    if(temp == 0)
+                        infinite.imaginary = 0;
+                    else
+                        infinite.imaginary = temp * Double.POSITIVE_INFINITY;
+                    break;
+                case 3:
+                    infinite.imaginary = Double.NEGATIVE_INFINITY;
+                    if(temp == 0)
+                        infinite.real = 0;
+                    else
+                        infinite.real = temp * Double.NEGATIVE_INFINITY;
+                    break;
+            }
+        }else if (a == 0){
+            infinite.real = numeratorVector[numeratorVector.length - 1]
+                    / denominatorVector[denominatorVector.length - 1];
+        }
+        return infinite;
+    }
+
+    private static Complex64F calculateTFValue(int astatism, double[] numeratorVector, double[] denominatorVector, double frequency){
+        Complex64F value;
+        Complex64F numerator = calculatePolynomialValue(frequency, numeratorVector);
+        Complex64F denominator = calculatePolynomialValue(frequency, denominatorVector);
+        double temp = denominator.getMagnitude2();
+        value = new Complex64F();
+        if(temp == 0) {
+            value.real = Double.POSITIVE_INFINITY;
+        }
+        else{
+            value.real = numerator.real*denominator.real + numerator.imaginary*denominator.imaginary;
+            value.real /= temp;
+            value.imaginary = numerator.imaginary*denominator.real - numerator.real*denominator.imaginary;
+            value.imaginary /= temp;
+
+            temp = Math.pow(frequency, astatism);
+            value.imaginary *= temp;
+            value.real *= temp;
+
+            int a = astatism % 4;
+            if(a < 0) a += 4;
+            for(; a > 0; a--){
+                temp = value.real;
+                value.real = -value.imaginary;
+                value.imaginary = temp;
+            }
+        }
+
+        return value;
+    }
+
+    public static boolean complex64FIsInfinite(Complex64F complex64F){
+        return Double.isInfinite(complex64F.real) || Double.isInfinite(complex64F.imaginary);
     }
 
     public String format(Complex64F value){
@@ -275,5 +411,17 @@ public class ResultActivity extends Activity {
             s += "∞";
         else s += Float.toString((float) Math.abs(value.imaginary)).replaceAll("\\.?0*$", "");
         return s;
+    }
+
+    @Override
+    public void onSaveInstanceState(Bundle savedInstanceState) {
+        super.onSaveInstanceState(savedInstanceState);
+        savedInstanceState.putParcelable(PARCELABLE_ORIGINAL_TF, this.originalTransferFunction.onSaveInstanceState());
+    }
+
+    @Override
+    public void onRestoreInstanceState(Bundle savedInstanceState) {
+        super.onRestoreInstanceState(savedInstanceState);
+        this.originalTransferFunction.onRestoreInstanceState(savedInstanceState.getParcelable(PARCELABLE_ORIGINAL_TF));
     }
 }

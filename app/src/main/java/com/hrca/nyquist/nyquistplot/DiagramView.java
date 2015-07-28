@@ -37,11 +37,6 @@ public class DiagramView extends SurfaceView {
     private static final double FREQUENCY_DENSITY = 20;
     private static final double FREQUENCY_LOG_EXPANSION = 1.0;
     private float pixelsPerUnit;
-    double[] numeratorVector;
-    double[] denominatorVector;
-    int astatism;
-    private double minFrequency;
-    private double maxFrequency;
     private Complex64F min;
     private Complex64F max;
     private int backgroundColor;
@@ -52,6 +47,9 @@ public class DiagramView extends SurfaceView {
     private final Paint secondaryCurvePaint;
     private final Paint unitCirclePaint;
     private final Paint textPaint;
+    private Complex64F zero;
+    private Complex64F[] values;
+    private Complex64F infinite;
 
     public DiagramView(Context context) {
         this(context, null);
@@ -112,144 +110,24 @@ public class DiagramView extends SurfaceView {
         this.textPaint.setTextSize(textSize);
     }
 
-    public void draw(int astatism, double[] numeratorVector, double[] denominatorVector, double minFrequency, double maxFrequency){
-        this.astatism = astatism;
-        this.numeratorVector = numeratorVector;
-        this.denominatorVector = denominatorVector;
-        this.minFrequency = minFrequency - FREQUENCY_LOG_EXPANSION;
-        this.maxFrequency = maxFrequency + FREQUENCY_LOG_EXPANSION;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                drawNyquist();
-            }
-        }).start();
-    }
-
-    private void drawNyquist(){
+    public void setPoints(Complex64F zero, Complex64F[] values, Complex64F infinite){
         this.min = new Complex64F(0, 0);
         this.max = new Complex64F(0, 0);
-        long startTime = System.currentTimeMillis();
-        long time = startTime;
-        long end;
-        double[] frequencies = getFrequencies();
-        Complex64F[] values = new Complex64F[frequencies.length];
-        Complex64F value;
-        Complex64F numerator = null;
-        Complex64F denominator = null;
-        double temp;
-        int a;
 
-        Complex64F zero = new Complex64F(0, 0);
-        if(astatism == 0){
-            zero.real = this.numeratorVector[0] / this.denominatorVector[0];
-            adjustBorders(zero);
+        this.zero = zero;
+        this.values = values;
+        this.infinite = infinite;
+
+        if(!ResultActivity.complex64FIsInfinite(this.zero)){
+            adjustBorders(this.zero);
         }
-        else if(astatism < 0){
-            switch (astatism % 4 + 4){
-                case 0:
-                    zero.real = Double.POSITIVE_INFINITY;
-                    break;
-                case 1:
-                    zero.imaginary = Double.NEGATIVE_INFINITY;
-                    break;
-                case 2:
-                    zero.real = Double.NEGATIVE_INFINITY;
-                    break;
-                case 3:
-                    zero.imaginary = Double.POSITIVE_INFINITY;
-                    break;
-            }
-        }
-        ResultActivity activity = (ResultActivity)getContext();
-        activity.setZero(zero);
-
-        for(int i = 0; i < frequencies.length; i++){
-            numerator = calculatePolynomialValue(frequencies[i], this.numeratorVector, numerator);
-            denominator = calculatePolynomialValue(frequencies[i], this.denominatorVector, denominator);
-            temp = denominator.getMagnitude2();
-            value = new Complex64F();
-            if(temp == 0) {
-                value.real = Double.POSITIVE_INFINITY;
-            }
-            else{
-                value.real = numerator.real*denominator.real + numerator.imaginary*denominator.imaginary;
-                value.real /= temp;
-                value.imaginary = numerator.imaginary*denominator.real - numerator.real*denominator.imaginary;
-                value.imaginary /= temp;
-
-                temp = Math.pow(frequencies[i], this.astatism);
-                value.imaginary *= temp;
-                value.real *= temp;
-
-                a = astatism % 4;
-                if(a < 0) a += 4;
-                for(; a > 0; a--){
-                    temp = value.real;
-                    value.real = -value.imaginary;
-                    value.imaginary = temp;
-                }
-            }
-
-            if(complex64FIsInfinite(value)){
-                value = values[i-1];
-            }
-
-            values[i] =value;
-        }
-
-        temp = FREQUENCY_LOG_EXPANSION * FREQUENCY_DENSITY / 2;
-        for(int i = (int)temp; i < frequencies.length - temp; i ++){
+        double temp = FREQUENCY_LOG_EXPANSION * FREQUENCY_DENSITY / 2;
+        for(int i = (int)temp; i < values.length - temp; i ++){
             adjustBorders(values[i]);
         }
-
-        Complex64F infinite = new Complex64F(0, 0);
-        a = this.astatism + this.numeratorVector.length - this.denominatorVector.length;
-        if(a > 0){
-            double first = this.numeratorVector[this.numeratorVector.length - 1];
-            temp = 0;
-            if(this.numeratorVector.length > 1)
-                temp = this.numeratorVector[this.numeratorVector.length - 2];
-            switch (a % 4){
-                case 0:
-                    infinite.real = first * Double.POSITIVE_INFINITY;
-                    if(temp == 0)
-                        infinite.imaginary = 0;
-                    else
-                        infinite.imaginary = temp * Double.NEGATIVE_INFINITY;
-                    break;
-                case 1:
-                    infinite.imaginary = first * Double.POSITIVE_INFINITY;
-                    if(a == 1){
-                        infinite.real = this.numeratorVector[this.numeratorVector.length - 2]
-                            / this.denominatorVector[this.denominatorVector.length - 1];
-                    }
-                    else if(temp == 0)
-                        infinite.real = 0;
-                    else
-                        infinite.real = temp * Double.POSITIVE_INFINITY;
-                    break;
-                case 2:
-                    infinite.real = first * Double.NEGATIVE_INFINITY;
-                    if(temp == 0)
-                        infinite.imaginary = 0;
-                    else
-                        infinite.imaginary = temp * Double.POSITIVE_INFINITY;
-                    break;
-                case 3:
-                    infinite.imaginary = Double.NEGATIVE_INFINITY;
-                    if(temp == 0)
-                        infinite.real = 0;
-                    else
-                        infinite.real = temp * Double.NEGATIVE_INFINITY;
-                    break;
-            }
-        }else if (a == 0){
-            infinite.real = this.numeratorVector[this.numeratorVector.length - 1]
-                    / this.denominatorVector[this.denominatorVector.length - 1];
-            adjustBorders(infinite);
+        if(!ResultActivity.complex64FIsInfinite(this.infinite)){
+            adjustBorders(this.infinite);
         }
-        activity.setInfinite(infinite);
 
         if(max.imaginary > -min.imaginary)
             min.imaginary = -max.imaginary;
@@ -281,7 +159,7 @@ public class DiagramView extends SurfaceView {
                 height = width;
             }
         }
-        a = getContext().getResources().getDisplayMetrics().widthPixels;
+        int a = getContext().getResources().getDisplayMetrics().widthPixels;
         a -= PIXELS_LEFT_PADDING + PIXELS_RIGHT_PADDING;
         a -= 2 * getResources().getDimension(R.dimen.activity_horizontal_margin);
         if(width > height){
@@ -290,9 +168,16 @@ public class DiagramView extends SurfaceView {
         else{
             pixelsPerUnit = a/width;
         }
-        end = System.currentTimeMillis();
-        Log.d("Time", "Calculation time: " + Long.toString(end - time) + " milliseconds");
-        time = end;
+    }
+
+    public void redraw(){
+        if(values == null){
+            return;
+        }
+        long startTime = System.currentTimeMillis();
+        long time = startTime;
+        long end;
+
         View parent = (View)this.getParent();
         this.getLayoutParams().height = (int)getY(this.min) + (int)PIXELS_BOTTOM_PADDING;
         this.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
@@ -318,22 +203,11 @@ public class DiagramView extends SurfaceView {
         drawVerticals(canvas);
         drawHorizontals(canvas);
         drawAxis(canvas);
-        drawCurve(canvas, zero, values, infinite);
+        drawCurve(canvas, this.zero, this.values, this.infinite);
         cover(canvas);
         end = System.currentTimeMillis();
         Log.d("Time", "Total drawing time " + Long.toString(end - startTime) + " milliseconds");
         sh.unlockCanvasAndPost(canvas);
-    }
-
-    private double[] getFrequencies(){
-        double step = 1/FREQUENCY_DENSITY;
-        int total = (int)((maxFrequency - minFrequency)*FREQUENCY_DENSITY) + 1;
-        double[] result = new double[total];
-        double current = minFrequency;
-        for(int i = 0 ; i < total; i++, current += step){
-            result[i] = Math.pow(10, current);
-        }
-        return result;
     }
 
     private void drawHorizontals(Canvas canvas){
@@ -357,22 +231,19 @@ public class DiagramView extends SurfaceView {
         float imaginary = (float)Math.ceil(this.min.imaginary/step)*step;
 
         float width = getX(this.max) - getX(this.min);
-        float x;
-        float y;
+        float value;
         float[] pts = new float[4*(int)(width/linesLength/2)];
 
-        x = getX(this.min);
-        for(int i = 0; 4*i < pts.length; i ++){
-            pts[4*i] = x += linesLength;
-            pts[4*i + 2] = x += linesLength;
+        value = getX(this.min);
+        for(int i = 0; i < pts.length; i += 2){
+            pts[i] = value += linesLength;
         }
 
         for(; imaginary <= this.max.imaginary; imaginary += step) {
-            y = getY(imaginary);
-            canvas.drawText(Float.toString(imaginary).replaceAll("\\.?0*$", ""), getX(0) + 12, y + textPaint.getTextSize(), textPaint);
-            for(int i = 0; 4*i < pts.length; i ++){
-                pts[4*i + 1] = y;
-                pts[4*i + 3] = y;
+            value = getY(imaginary);
+            canvas.drawText(Float.toString(imaginary).replaceAll("\\.?0*$", ""), getX(0) + 12, value + textPaint.getTextSize(), textPaint);
+            for(int i = 1; i < pts.length; i += 2){
+                pts[i] = value;
             }
             canvas.drawLines(pts, this.linesPaint);
         }
@@ -399,22 +270,19 @@ public class DiagramView extends SurfaceView {
         float real = (float)Math.ceil(this.min.real/step)*step;
 
         float height = getY(this.min) - getY(this.max);
-        float x;
-        float y;
+        float value;
         float[] pts = new float[4*(int)(height/linesLength/2)];
 
-        y = getY(this.max);
-        for(int i = 0; 4*i < pts.length; i ++){
-            pts[4*i + 1] = y += linesLength;
-            pts[4*i + 3] = y += linesLength;
+        value = getY(this.max);
+        for(int i = 1; i < pts.length; i += 2){
+            pts[i] = value += linesLength;
         }
 
         for(; real <= this.max.real; real += step){
-            x = getX(real);
-            canvas.drawText(Float.toString(real).replaceAll("\\.?0*$", ""), x + 12, getY(0) + textPaint.getTextSize(), textPaint);
-            for(int i = 0; 4*i < pts.length; i ++){
-                pts[4*i] = x;
-                pts[4*i + 2] = x;
+            value = getX(real);
+            canvas.drawText(Float.toString(real).replaceAll("\\.?0*$", ""), value + 12, getY(0) + textPaint.getTextSize(), textPaint);
+            for(int i = 0; i < pts.length; i += 2){
+                pts[i] = value;
             }
             canvas.drawLines(pts, this.linesPaint);
         }
@@ -434,14 +302,14 @@ public class DiagramView extends SurfaceView {
 
     private void drawCurve(Canvas canvas, Complex64F zero, Complex64F[] values, Complex64F infinite){
         int totalPoints = values.length - 1;
-        if(!complex64FIsInfinite(zero))
+        if(!ResultActivity.complex64FIsInfinite(zero))
             totalPoints ++;
-        if(!complex64FIsInfinite(infinite))
+        if(!ResultActivity.complex64FIsInfinite(infinite))
             totalPoints ++;
         float[] points = new float[4 * totalPoints];
 
         int pointCounter = 0;
-        if(!complex64FIsInfinite(zero)){
+        if(!ResultActivity.complex64FIsInfinite(zero)){
             points[0] = getX(zero);
             points[1] = getY(zero);
             points[2] = getX(values[0]);
@@ -459,7 +327,7 @@ public class DiagramView extends SurfaceView {
         points[4*pointCounter + 2] = getX(values[valueCounter]);
         points[4*pointCounter + 3] = getY(values[valueCounter]);
 
-        if(!complex64FIsInfinite(infinite)){
+        if(!ResultActivity.complex64FIsInfinite(infinite)){
             pointCounter ++;
             points[4*pointCounter + 0] = getX(values[valueCounter]);
             points[4*pointCounter + 1] = getY(values[valueCounter]);
@@ -477,24 +345,6 @@ public class DiagramView extends SurfaceView {
         canvas.drawLines(points, this.secondaryCurvePaint);
     }
 
-    private Complex64F calculatePolynomialValue(double frequency, double[] coefficients, Complex64F reusableComplex){
-        int index = coefficients.length - 1;
-        double resultReal = coefficients[index];
-        double resultImaginary = 0;
-        double tmp;
-        for (index --; index >= 0; index --) {
-            tmp = resultReal;
-            resultReal = -resultImaginary*frequency + coefficients[index];
-            resultImaginary = tmp * frequency;
-        }
-        if(reusableComplex == null){
-            return new Complex64F(resultReal, resultImaginary);
-        }
-        reusableComplex.real = resultReal;
-        reusableComplex.imaginary = resultImaginary;
-        return reusableComplex;
-    }
-
     private float getX(double real){
         return (float)(real - this.min.real) * pixelsPerUnit + PIXELS_LEFT_PADDING;
     }
@@ -509,10 +359,6 @@ public class DiagramView extends SurfaceView {
 
     private float getY(Complex64F value){
         return getY(value.imaginary);
-    }
-
-    private static boolean complex64FIsInfinite(Complex64F complex64F){
-        return Double.isInfinite(complex64F.real) || Double.isInfinite(complex64F.imaginary);
     }
 
     private void adjustBorders(Complex64F value){
