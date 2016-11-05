@@ -16,6 +16,9 @@ import org.ejml.interfaces.decomposition.EigenDecomposition;
 
 import java.util.ArrayList;
 
+import fr.nicolaspomepuy.discreetapprate.AppRate;
+import fr.nicolaspomepuy.discreetapprate.RetryPolicy;
+
 public class ResultActivity extends Activity {
     public static final String PARCELABLE_ORIGINAL_TF = "originalTF";
     private static final double FREQUENCY_DENSITY = 20;
@@ -122,6 +125,12 @@ public class ResultActivity extends Activity {
             this.infiniteView.setText("H(j∞) = " + format(infinite));
 
             this.diagram.setPoints(zero, values, infinite);
+
+            AppRate.with(this)
+                    .initialLaunchCount(5)
+                    .retryPolicy(RetryPolicy.INCREMENTAL)
+                    .installedSince(0)
+                    .checkAndShow();
         }
     }
 

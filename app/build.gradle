@@ -8,8 +8,8 @@ android {
         applicationId "com.hrca.nyquist.nyquistplot"
         minSdkVersion 8
         targetSdkVersion 21
-        versionCode 2
-        versionName "1.0.1"
+        versionCode 4
+        versionName "1.4"
     }
     buildTypes {
         release {
@@ -22,5 +22,6 @@ android {
 dependencies {
     compile fileTree(dir: 'libs', include: ['*.jar'])
     compile 'com.android.support:appcompat-v7:21.0.3'
+    compile 'fr.nicolaspomepuy:discreetapprate:2.0.3@aar'
     compile files('libs/EJML-core-0.26.jar')
 }
