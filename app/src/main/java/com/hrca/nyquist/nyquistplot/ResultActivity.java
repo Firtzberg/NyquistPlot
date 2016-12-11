@@ -129,7 +129,7 @@ public class ResultActivity extends Activity {
             AppRate.with(this)
                     .initialLaunchCount(5)
                     .retryPolicy(RetryPolicy.INCREMENTAL)
-                    .installedSince(0)
+                    .installedSince(43200000)
                     .checkAndShow();
         }
     }
