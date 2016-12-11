@@ -6,6 +6,7 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.AttributeSet;
 import android.view.View;
+import android.view.inputmethod.EditorInfo;
 import android.widget.EditText;
 
 import com.hrca.nyquist.customs.PolynomialElementBaseView;
@@ -32,24 +33,28 @@ public class EditablePolynomialElementView extends PolynomialElementBaseView<Edi
         this.numeratorView.setInputType(InputType.TYPE_NUMBER_FLAG_DECIMAL |
                 InputType.TYPE_CLASS_NUMBER |
                 InputType.TYPE_NUMBER_FLAG_SIGNED);
+        this.numeratorView.setImeOptions(EditorInfo.IME_ACTION_DONE);
         this.numeratorView.addTextChangedListener(new TextWatcher() {
             @Override
-            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
 
             @Override
-            public void onTextChanged(CharSequence s, int start, int before, int count) {}
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+            }
 
             @Override
             public void afterTextChanged(Editable s) {
                 try {
                     numerator = Double.parseDouble(s.toString());
-                } catch (NumberFormatException nfe){
+                } catch (NumberFormatException nfe) {
                     numerator = 1;
                 }
             }
         });
         this.denominatorView.setInputType(InputType.TYPE_NUMBER_FLAG_DECIMAL |
                 InputType.TYPE_CLASS_NUMBER);
+        this.denominatorView.setImeOptions(EditorInfo.IME_ACTION_DONE);
         this.denominatorView.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(CharSequence s, int start, int count, int after) {
