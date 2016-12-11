@@ -34,17 +34,32 @@ public class TFCalculator implements TFCalculatorInterface{
         Complex64F zero = new Complex64F(0, 0);
         if(astatism == 0){
             zero.real = numeratorVector[0] / denominatorVector[0];
+            // Quick fix for "-0" display
+            if (zero.real == 0){
+                zero.real = 0;
+            }
         }
         else if(astatism < 0){
             switch (astatism % 4 + 4){
+                case 4:
                 case 0:
-                    zero.real = Double.POSITIVE_INFINITY;
+                    if (numeratorVector[0] * denominatorVector[0] < 0){
+                        zero.real = Double.NEGATIVE_INFINITY;
+                    }
+                    else {
+                        zero.real = Double.POSITIVE_INFINITY;
+                    }
                     break;
                 case 1:
                     zero.imaginary = Double.NEGATIVE_INFINITY;
                     break;
                 case 2:
-                    zero.real = Double.NEGATIVE_INFINITY;
+                    if (numeratorVector[0] * denominatorVector[0] < 0){
+                        zero.real = Double.POSITIVE_INFINITY;
+                    }
+                    else {
+                        zero.real = Double.NEGATIVE_INFINITY;
+                    }
                     break;
                 case 3:
                     zero.imaginary = Double.POSITIVE_INFINITY;
