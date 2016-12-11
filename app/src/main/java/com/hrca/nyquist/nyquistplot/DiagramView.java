@@ -111,8 +111,8 @@ public class DiagramView extends SurfaceView {
     }
 
     public void setPoints(Complex64F zero, Complex64F[] values, Complex64F infinite){
-        this.min = new Complex64F(0, 0);
-        this.max = new Complex64F(0, 0);
+        this.min = new Complex64F(-1, -1);
+        this.max = new Complex64F(1, 1);
 
         this.zero = zero;
         this.values = values;
@@ -133,6 +133,12 @@ public class DiagramView extends SurfaceView {
             min.imaginary = -max.imaginary;
         if(min.imaginary < -max.imaginary)
             max.imaginary = -min.imaginary;
+
+        if (max.imaginary - min.imaginary > 2 * (max.real - min.real))
+        {
+            max.real *= (max.imaginary - min.imaginary)/ (2 * (max.real - min.real));
+            min.real *= (max.imaginary - min.imaginary)/ (2 * (max.real - min.real));
+        }
 
         float width = (float)(max.real - min.real);
         max.real += width*0.05F;
@@ -183,7 +189,9 @@ public class DiagramView extends SurfaceView {
         this.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
         parent.getLayoutParams().height = (int)getY(this.min) + (int)PIXELS_BOTTOM_PADDING;
         parent.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
-        parent.requestLayout();
+        Log.d("height", String.valueOf(this.getLayoutParams().height));
+        Log.d("width", String.valueOf(this.getLayoutParams().width));
+        //parent.requestLayout();
         SurfaceHolder sh = this.getHolder();
         Canvas canvas;
         Log.d("Meanwhile", "Waiting for canvas");
