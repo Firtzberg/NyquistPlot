@@ -69,7 +69,13 @@ public class TransferFunctionView extends TransferFunctionBaseView {
 
     @Override
     public void setGain(double gain){
-        super.setGain(gain);
+        float tmp = (float)gain;
+        if(tmp == (int)tmp){
+            this.gainView.setText(Integer.toString((int)tmp));
+        }
+        else {
+            this.gainView.setText(Float.toString(tmp));
+        }
         this.adjustGainVisibility();
     }
 

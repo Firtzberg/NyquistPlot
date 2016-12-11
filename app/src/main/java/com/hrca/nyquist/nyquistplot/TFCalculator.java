@@ -1,13 +1,6 @@
 package com.hrca.nyquist.nyquistplot;
 
-import com.hrca.nyquist.customs.TransferFunctionBaseView;
-
 import org.ejml.data.Complex64F;
-import org.ejml.data.DenseMatrix64F;
-import org.ejml.factory.DecompositionFactory;
-import org.ejml.interfaces.decomposition.EigenDecomposition;
-
-import java.util.ArrayList;
 
 /**
  * Created by hrvoje on 31.07.15..

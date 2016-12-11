@@ -28,6 +28,16 @@ public class PolynomialElementView extends PolynomialElementBaseView<TextView> {
         this.reposition();
     }
 
+    private String valueToText(double value){
+        float tmp = (float)value;
+        if(Math.abs(Math.round(tmp) - tmp) < 0.02){
+            return Integer.toString((int)tmp);
+        }
+        else{
+            return Float.toString(tmp);
+        }
+    }
+
     protected void reposition(){
         this.setVisibility((float)this.numerator == 0 ? GONE : VISIBLE);
 
@@ -37,7 +47,7 @@ public class PolynomialElementView extends PolynomialElementBaseView<TextView> {
             this.fractalView.setVisibility(GONE);
         else {
             this.fractalView.setVisibility(VISIBLE);
-            this.numeratorView.setText(Float.toString((float) this.numerator));
+            this.numeratorView.setText(this.valueToText(this.numerator));
 
             if(this.denominator == 1){
                 this.denominatorView.setVisibility(GONE);
@@ -45,7 +55,7 @@ public class PolynomialElementView extends PolynomialElementBaseView<TextView> {
 
             }
             else{
-                this.denominatorView.setText(Float.toString((float)this.denominator));
+                this.denominatorView.setText(this.valueToText(this.denominator));
                 this.fractionBarView.setVisibility(VISIBLE);
                 this.denominatorView.setVisibility(VISIBLE);
             }
