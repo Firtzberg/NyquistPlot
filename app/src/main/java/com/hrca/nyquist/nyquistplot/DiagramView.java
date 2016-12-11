@@ -36,6 +36,7 @@ public class DiagramView extends SurfaceView {
     private static final float RELATIVE_CURVE_THICKNESS = 1.5F;
     private static final double FREQUENCY_DENSITY = 20;
     private static final double FREQUENCY_LOG_EXPANSION = 1.0;
+    private static final double MAX_DIAGRAM_RATIO = 2.0;
     private float pixelsPerUnit;
     private Complex64F min;
     private Complex64F max;
@@ -134,10 +135,17 @@ public class DiagramView extends SurfaceView {
         if(min.imaginary < -max.imaginary)
             max.imaginary = -min.imaginary;
 
-        if (max.imaginary - min.imaginary > 2 * (max.real - min.real))
+        if (max.imaginary - min.imaginary > MAX_DIAGRAM_RATIO * (max.real - min.real))
         {
-            max.real *= (max.imaginary - min.imaginary)/ (2 * (max.real - min.real));
-            min.real *= (max.imaginary - min.imaginary)/ (2 * (max.real - min.real));
+            double missing = (max.imaginary - min.imaginary)/ MAX_DIAGRAM_RATIO - (max.real - min.real);
+            max.real += missing/2;
+            min.real -= missing/2;
+        }
+        if (max.real - min.real > MAX_DIAGRAM_RATIO * (max.imaginary - min.imaginary))
+        {
+            double missing = (max.real - min.real)/ MAX_DIAGRAM_RATIO - (max.imaginary - min.imaginary);
+            max.imaginary += missing/2;
+            min.imaginary -= missing/2;
         }
 
         float width = (float)(max.real - min.real);
