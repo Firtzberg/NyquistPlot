@@ -92,6 +92,13 @@ public class PolynomialView extends PolynomialBaseView<PolynomialElementView> {
 
         PolynomialElementView zero;
         if(first == -1){
+            if(this.list.size() == 0){
+                this.add();
+                zero = this.list.get(0);
+                zero.setNumerator(0);
+                zero.setExponent(0);
+                zero.setDenominator(1);
+            }
             zero = this.list.get(0);
             zero.setVisibility(VISIBLE);
             zero.setShowSign(false);
