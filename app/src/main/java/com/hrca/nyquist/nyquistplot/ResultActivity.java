@@ -104,7 +104,10 @@ public class ResultActivity extends Activity {
             for(int i = 0; i < numeratorParameters.vector.length; i ++){
                 numeratorParameters.vector[i] *= gain;
             }
-            HistoryHelper.add(this.originalTransferFunction);
+
+            // save transfer function if this is the first time onCreate is called
+            if(savedInstanceState == null)
+                HistoryHelper.add(this.originalTransferFunction);
 
             double[] frequencies = getFrequencies();
             Complex64F[] values = new Complex64F[frequencies.length];
