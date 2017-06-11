@@ -16,7 +16,6 @@ import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
-import android.view.View;
 
 import org.ejml.data.Complex64F;
 
@@ -24,7 +23,7 @@ import org.ejml.data.Complex64F;
 /**
  * TODO: document your custom view class.
  */
-public class DiagramView extends SurfaceView {
+public class DiagramView extends SurfaceView implements SurfaceHolder.Callback {
     private static final float DENSITY_COEFFICIENT = Resources.getSystem().getDisplayMetrics().density;
     private static final float PIXELS_LEFT_PADDING = 20 * DENSITY_COEFFICIENT;
     private static final float PIXELS_TOP_PADDING = 20 * DENSITY_COEFFICIENT;
@@ -42,21 +41,16 @@ public class DiagramView extends SurfaceView {
     private static final float RELATIVE_CURVE_THICKNESS = 1.5F;
     private static final double FREQUENCY_DENSITY = 20;
     private static final double FREQUENCY_LOG_EXPANSION = 1.0;
-    private static final double MAX_DIAGRAM_RATIO = 2.0;
     public static final String PARCELABLE_MAX_KEY = "max";
     public static final String PARCELABLE_MIN_KEY = "min";
     public static final String PARCELABLE_REAL_KEY = "real";
     public static final String PARCELABLE_IMAGINARY_KEY = "imaginary";
     public static final String PARCELABLE_PIXEL_PER_UNIT_KEY = "ppu";
-    public static final String PARCELABLE_INITIAL_MAX_KEY = "imax";
-    public static final String PARCELABLE_INITIAL_MIN_KEY = "imin";
-    public static final String PARCELABLE_INITIAL_PIXEL_PER_UNIT_KEY = "ippu";
     private float pixelsPerUnit;
     private Complex64F min;
     private Complex64F max;
-    private float initialPixelsPerUnit;
-    private Complex64F initialMax;
-    private Complex64F initialMin;
+    private Complex64F defaultMax;
+    private Complex64F defaultMin;
     private int backgroundColor;
     private final Paint backgroundPaint;
     private final Paint linesPaint;
@@ -94,6 +88,10 @@ public class DiagramView extends SurfaceView {
         this.textPaint.setStrokeWidth(DENSITY_COEFFICIENT);
         this.scaleDetector = new ScaleGestureDetector(context, new MyScaleListener());
         this.scrollDetector = new GestureDetector(context, new MyScrollListener());
+
+        //subscribe to surface callbacks
+        SurfaceHolder holder = getHolder();
+        holder.addCallback(this);
 
         init(attrs);
     }
@@ -133,8 +131,10 @@ public class DiagramView extends SurfaceView {
     }
 
     public void setPoints(Complex64F zero, Complex64F[] values, Complex64F infinite){
-        this.min = new Complex64F(-1, -1);
-        this.max = new Complex64F(1, 1);
+        this.max = null;
+        this.min = null;
+        this.defaultMin = new Complex64F(-1, -1);
+        this.defaultMax = new Complex64F(1, 1);
 
         this.zero = zero;
         this.values = values;
@@ -151,93 +151,101 @@ public class DiagramView extends SurfaceView {
             adjustBorders(this.infinite);
         }
 
-        if(max.imaginary > -min.imaginary)
-            min.imaginary = -max.imaginary;
-        if(min.imaginary < -max.imaginary)
-            max.imaginary = -min.imaginary;
+        if(defaultMax.imaginary > -defaultMin.imaginary)
+            defaultMin.imaginary = -defaultMax.imaginary;
+        if(defaultMin.imaginary < -defaultMax.imaginary)
+            defaultMax.imaginary = -defaultMin.imaginary;
 
-        if (max.imaginary - min.imaginary > MAX_DIAGRAM_RATIO * (max.real - min.real))
-        {
-            double missing = (max.imaginary - min.imaginary)/ MAX_DIAGRAM_RATIO - (max.real - min.real);
-            max.real += missing/2;
-            min.real -= missing/2;
-        }
-        if (max.real - min.real > MAX_DIAGRAM_RATIO * (max.imaginary - min.imaginary))
-        {
-            double missing = (max.real - min.real)/ MAX_DIAGRAM_RATIO - (max.imaginary - min.imaginary);
-            max.imaginary += missing/2;
-            min.imaginary -= missing/2;
-        }
+        // give a bit space
+        double space = 0.05F*(defaultMax.real - defaultMin.real);
+        defaultMax.real += space;
+        defaultMin.real -= space;
+        space = 0.05F*(defaultMax.imaginary - defaultMin.imaginary);
+        defaultMax.imaginary += space;
+        defaultMin.imaginary -= space;
 
-        float width = (float)(max.real - min.real);
-        max.real += width*0.05F;
-        min.real -= width*0.05F;
-        width *= 1.1F;
-        float height = (float)(max.imaginary - min.imaginary);
-        max.imaginary += height*0.05F;
-        min.imaginary -= height*0.05F;
-        height *= 1.1F;
-        if(width == 0 && height == 0){
-            max.real = max.imaginary = 1;
-            min.real = min.imaginary = -1;
-            width = height = 2;
-        }
-        else {
-            if(width == 0){
-                max.real = height/2;
-                min.real = -height/2;
-                width = (float)(max.real - min.real);
-            }
-            if(height == 0){
-                max.imaginary = width/2;
-                min.imaginary = -width/2;
-                height = (float)(max.imaginary - min.imaginary);
-            }
-        }
-        int a = getContext().getResources().getDisplayMetrics().widthPixels;
-        a -= PIXELS_LEFT_PADDING + PIXELS_RIGHT_PADDING;
-        a -= 2 * getResources().getDimension(R.dimen.activity_horizontal_margin);
-        if(width > height){
-            pixelsPerUnit = a/height;
-        }
-        else{
-            pixelsPerUnit = a/width;
-        }
-        this.initialMax = new Complex64F(this.max.real, this.max.imaginary);
-        this.initialMin = new Complex64F(this.min.real, this.min.imaginary);
-        this.initialPixelsPerUnit = this.pixelsPerUnit;
+        Log.d("defaultMax", this.defaultMax.toString());
+        Log.d("defaultMin", this.defaultMin.toString());
+        invalidate();
     }
 
-    public void redraw(){
+    @Override
+    public void surfaceCreated(SurfaceHolder holder){
+        // enable invocations of onDraw after invalidation.
+        setWillNotDraw(false);
+    }
+
+    @Override
+    public void surfaceChanged(SurfaceHolder holder, int format, int width, int height){
+        //remove padding
+        width -= PIXELS_LEFT_PADDING + PIXELS_RIGHT_PADDING;
+        height -= PIXELS_TOP_PADDING + PIXELS_BOTTOM_PADDING;
+        if(width <= 0 || height <= 0){
+            // TODO: handle
+        }
+
+        // go to default frame location if previous frame location is not available
+        if(this.min == null || this.max == null){
+            this.max = new Complex64F(this.defaultMax.real,
+                    this.defaultMax.imaginary);
+            this.min = new Complex64F(this.defaultMin.real,
+                    this.defaultMin.imaginary);
+
+            // use the smaller value of pixelsPerUnit to show whole graph
+            float defaultWidthInUnits = (float)(this.max.real - this.min.real);
+            float defaultHeightInUnits = (float)(this.max.imaginary - this.min.imaginary);
+            float ratioX = width / defaultWidthInUnits;
+            float ratioY = height / defaultHeightInUnits;
+            if (ratioX < ratioY){
+                pixelsPerUnit = ratioX;
+            }
+            else {
+                pixelsPerUnit = ratioY;
+            }
+        }
+
+        // Keep center centered and pixelsPerUnit. Since size changed the min and max have to be stretched.
+        float stretchFactor;
+        Complex64F focus = new Complex64F((this.max.real + this.min.real) / 2,
+                (this.max.imaginary + this.min.imaginary) / 2);
+        float widthInUnits = (float)(this.max.real - this.min.real);
+        float heightInUnits = (float)(this.max.imaginary - this.min.imaginary);
+        float ratioX = width / widthInUnits;
+        float ratioY = height / heightInUnits;
+
+        //stretch real axis
+        stretchFactor = ratioX/pixelsPerUnit;
+        //Log.d("Stretch X", String.valueOf(stretchFactor));
+        this.max.real = focus.real +
+                stretchFactor * (this.max.real - focus.real);
+        this.min.real = focus.real +
+                stretchFactor * (this.min.real - focus.real);
+
+        // stretch imaginary axis
+        stretchFactor = ratioY/pixelsPerUnit;
+        //Log.d("Stretch Y", String.valueOf(stretchFactor));
+        this.max.imaginary = focus.imaginary +
+                stretchFactor * (this.max.imaginary - focus.imaginary);
+        this.min.imaginary = focus.imaginary +
+                stretchFactor * (this.min.imaginary - focus.imaginary);
+        invalidate();
+    }
+
+    @Override
+    public void surfaceDestroyed (SurfaceHolder holder){
+
+    }
+
+    @Override
+    public void onDraw(Canvas canvas){
+        super.onDraw(canvas);
         if(values == null){
             return;
         }
         long startTime = System.currentTimeMillis();
-        long time = startTime;
         long end;
-
-        View parent = (View)this.getParent();
-        this.getLayoutParams().height = (int)getY(this.min) + (int)PIXELS_BOTTOM_PADDING;
-        this.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
-        parent.getLayoutParams().height = (int)getY(this.min) + (int)PIXELS_BOTTOM_PADDING;
-        parent.getLayoutParams().width = (int)getX(this.max) + (int)PIXELS_RIGHT_PADDING;
-        Log.d("height", String.valueOf(this.getLayoutParams().height));
-        Log.d("width", String.valueOf(this.getLayoutParams().width));
-        //parent.requestLayout();
-        SurfaceHolder sh = this.getHolder();
-        Canvas canvas;
-        Log.d("Meanwhile", "Waiting for canvas");
-        try {
-            Thread.sleep(20);
-            while((canvas = sh.lockCanvas()) == null) {
-                Thread.sleep(50);
-            }
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-            return;
-        }
-        end = System.currentTimeMillis();
-        Log.d("Time", "Waited for canvas: " + Long.toString(end - time) + " milliseconds");
+        Log.d("Max", this.max.toString());
+        Log.d("Min", this.min.toString());
         canvas.drawColor(backgroundColor);
         canvas.drawCircle(getX(0), getY(0), pixelsPerUnit, unitCirclePaint);
         drawVerticals(canvas);
@@ -247,7 +255,6 @@ public class DiagramView extends SurfaceView {
         cover(canvas);
         end = System.currentTimeMillis();
         Log.d("Time", "Total drawing time " + Long.toString(end - startTime) + " milliseconds");
-        sh.unlockCanvasAndPost(canvas);
     }
 
     private void drawHorizontals(Canvas canvas){
@@ -268,11 +275,11 @@ public class DiagramView extends SurfaceView {
         } else {
             step = (float)base;
         }
-        float imaginary = (float)Math.ceil(this.min.imaginary/step)*step;
+        float imaginary = (float)Math.ceil(this.min.imaginary / step) * step;
 
         float width = getX(this.max) - getX(this.min);
         float value;
-        float[] pts = new float[4*(int)(width/linesLength/2)];
+        float[] pts = new float[4*(int)(width / linesLength/2)];
 
         value = getX(this.min);
         for(int i = 0; i < pts.length; i += 2){
@@ -378,16 +385,16 @@ public class DiagramView extends SurfaceView {
 
     private void cover(Canvas canvas){
         canvas.drawRect(0, 0,
-                PIXELS_LEFT_PADDING, getY(min),
+                PIXELS_LEFT_PADDING, getHeight(),
                 this.backgroundPaint);
         canvas.drawRect(0, 0,
-                getX(max), PIXELS_TOP_PADDING,
+                getWidth(), PIXELS_TOP_PADDING,
                 this.backgroundPaint);
         canvas.drawRect(0, getY(min),
-                getX(max) + PIXELS_RIGHT_PADDING, getY(min) + PIXELS_BOTTOM_PADDING,
+                getWidth(), getHeight(),
                 this.backgroundPaint);
         canvas.drawRect(getX(max), 0,
-                this.getLayoutParams().width, this.getLayoutParams().height,
+                getWidth(), getHeight(),
                 this.backgroundPaint);
     }
 
@@ -453,14 +460,14 @@ public class DiagramView extends SurfaceView {
     }
 
     private void adjustBorders(Complex64F value){
-        if (value.real > max.real)
-            max.real = value.real;
-        if (value.real < min.real)
-            min.real = value.real;
-        if (value.imaginary > max.imaginary)
-            max.imaginary = value.imaginary;
-        if (value.imaginary < min.imaginary)
-            min.imaginary = value.imaginary;
+        if (value.real > defaultMax.real)
+            defaultMax.real = value.real;
+        if (value.real < defaultMin.real)
+            defaultMin.real = value.real;
+        if (value.imaginary > defaultMax.imaginary)
+            defaultMax.imaginary = value.imaginary;
+        if (value.imaginary < defaultMin.imaginary)
+            defaultMin.imaginary = value.imaginary;
     }
 
     @Override
@@ -487,7 +494,7 @@ public class DiagramView extends SurfaceView {
         this.max.imaginary = this.max.imaginary + offset.imaginary;
         this.min.real = this.min.real + offset.real;
         this.min.imaginary = this.min.imaginary + offset.imaginary;
-        redraw();
+        invalidate();
     }
 
     public void zoom(double zoomFactor, Complex64F focus){
@@ -498,16 +505,15 @@ public class DiagramView extends SurfaceView {
         this.min.real = focus.real + zoomFactor * (this.min.real - focus.real);
         this.min.imaginary = focus.imaginary + zoomFactor * (this.min.imaginary - focus.imaginary);
         this.pixelsPerUnit /= zoomFactor;
-        redraw();
+        invalidate();
     }
 
     public void reset(){
-        this.max.real = this.initialMax.real;
-        this.max.imaginary = this.initialMax.imaginary;
-        this.min.real = this.initialMin.real;
-        this.min.imaginary = this.initialMin.imaginary;
-        this.pixelsPerUnit = this.initialPixelsPerUnit;
-        redraw();
+        // forget previous frame location
+        this.max = null;
+        this.min = null;
+        // recalculate frame location
+        surfaceChanged(this.getHolder(), 0, this.getWidth(), this.getHeight());
     }
 
     private class MyScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
@@ -529,7 +535,7 @@ public class DiagramView extends SurfaceView {
             focusY = DiagramView.this.min.imaginary +
                     focusY * (DiagramView.this.max.imaginary - DiagramView.this.min.imaginary);
 
-            DiagramView.this.zoom(detector.getScaleFactor(), new Complex64F(focusX, focusY));
+            DiagramView.this.zoom(1/detector.getScaleFactor(), new Complex64F(focusX, focusY));
             return true;
         }
     }
@@ -585,9 +591,6 @@ public class DiagramView extends SurfaceView {
         bundle.putFloat(PARCELABLE_PIXEL_PER_UNIT_KEY, this.pixelsPerUnit);
         bundle.putParcelable(PARCELABLE_MAX_KEY, saveComplex64F(this.max));
         bundle.putParcelable(PARCELABLE_MIN_KEY, saveComplex64F(this.min));
-        bundle.putFloat(PARCELABLE_INITIAL_PIXEL_PER_UNIT_KEY, this.initialPixelsPerUnit);
-        bundle.putParcelable(PARCELABLE_INITIAL_MAX_KEY, saveComplex64F(this.initialMax));
-        bundle.putParcelable(PARCELABLE_INITIAL_MIN_KEY, saveComplex64F(this.initialMin));
         return bundle;
     }
 
@@ -598,9 +601,6 @@ public class DiagramView extends SurfaceView {
             this.pixelsPerUnit = bundle.getFloat(PARCELABLE_PIXEL_PER_UNIT_KEY);
             this.max = restoreComplex64F(bundle.getParcelable(PARCELABLE_MAX_KEY));
             this.min = restoreComplex64F(bundle.getParcelable(PARCELABLE_MIN_KEY));
-            this.initialPixelsPerUnit = bundle.getFloat(PARCELABLE_INITIAL_PIXEL_PER_UNIT_KEY);
-            this.initialMax = restoreComplex64F(bundle.getParcelable(PARCELABLE_INITIAL_MAX_KEY));
-            this.initialMin = restoreComplex64F(bundle.getParcelable(PARCELABLE_INITIAL_MIN_KEY));
             state = bundle.getParcelable("instanceState");
         }
         if(state != null)

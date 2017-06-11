@@ -135,17 +135,6 @@ public class ResultActivity extends Activity {
         }
     }
 
-    @Override
-    public void onResume(){
-        super.onResume();
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                ResultActivity.this.diagram.redraw();
-            }
-        }).start();
-    }
-
     private void finishWithError(int messageIdentifier){
         Intent myIntent = new Intent();
         myIntent.putExtra(InputActivity.EXTRA_DISPLAY_ERROR_MESSAGE_R_ID, messageIdentifier);
