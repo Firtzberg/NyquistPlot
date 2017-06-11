@@ -6,8 +6,12 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.support.annotation.NonNull;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.view.GestureDetector;
+import android.view.MotionEvent;
+import android.view.ScaleGestureDetector;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
@@ -32,7 +36,7 @@ public class DiagramView extends SurfaceView {
     private static final int COLOR_DEFAULT_SECONDARY_CURVE = Color.RED;
     private static final int COLOR_DEFAULT_UNIT_CIRCLE = Color.GREEN;
     private static final int COLOR_DEFAULT_TEXT = Color.BLACK;
-    private static final float SIZE_DEFAULT_TEXT = 12 * Resources.getSystem().getDisplayMetrics().scaledDensity;
+    private static final int SIZE_DEFAULT_TEXT = (int)(12 * Resources.getSystem().getDisplayMetrics().scaledDensity);
     private static final float RELATIVE_CURVE_THICKNESS = 1.5F;
     private static final double FREQUENCY_DENSITY = 20;
     private static final double FREQUENCY_LOG_EXPANSION = 1.0;
@@ -40,6 +44,9 @@ public class DiagramView extends SurfaceView {
     private float pixelsPerUnit;
     private Complex64F min;
     private Complex64F max;
+    private float initialPixelsPerUnit;
+    private Complex64F initialMax;
+    private Complex64F initialMin;
     private int backgroundColor;
     private final Paint backgroundPaint;
     private final Paint linesPaint;
@@ -51,6 +58,8 @@ public class DiagramView extends SurfaceView {
     private Complex64F zero;
     private Complex64F[] values;
     private Complex64F infinite;
+    private ScaleGestureDetector scaleDetector;
+    private GestureDetector scrollDetector;
 
     public DiagramView(Context context) {
         this(context, null);
@@ -73,6 +82,8 @@ public class DiagramView extends SurfaceView {
         this.unitCirclePaint.setStyle(Paint.Style.STROKE);
         this.textPaint = new Paint();
         this.textPaint.setStrokeWidth(DENSITY_COEFFICIENT);
+        this.scaleDetector = new ScaleGestureDetector(context, new MyScaleListener());
+        this.scrollDetector = new GestureDetector(context, new MyScrollListener());
 
         init(attrs);
     }
@@ -97,7 +108,7 @@ public class DiagramView extends SurfaceView {
             secondaryCurveColor = a.getColor(R.styleable.DiagramView_secondary_curve_color, COLOR_DEFAULT_SECONDARY_CURVE);
             unitCircleColor = a.getColor(R.styleable.DiagramView_unit_circle_color, COLOR_DEFAULT_UNIT_CIRCLE);
             textColor = a.getColor(R.styleable.DiagramView_curve_color, COLOR_DEFAULT_TEXT);
-            textSize = a.getFloat(R.styleable.DiagramView_size_text, SIZE_DEFAULT_TEXT);
+            textSize = a.getDimensionPixelSize(R.styleable.DiagramView_size_text, SIZE_DEFAULT_TEXT);
         } finally {
             a.recycle();
         }
@@ -165,12 +176,12 @@ public class DiagramView extends SurfaceView {
             if(width == 0){
                 max.real = height/2;
                 min.real = -height/2;
-                width = height;
+                width = (float)(max.real - min.real);
             }
             if(height == 0){
                 max.imaginary = width/2;
                 min.imaginary = -width/2;
-                height = width;
+                height = (float)(max.imaginary - min.imaginary);
             }
         }
         int a = getContext().getResources().getDisplayMetrics().widthPixels;
@@ -182,6 +193,9 @@ public class DiagramView extends SurfaceView {
         else{
             pixelsPerUnit = a/width;
         }
+        this.initialMax = new Complex64F(this.max.real, this.max.imaginary);
+        this.initialMin = new Complex64F(this.min.real, this.min.imaginary);
+        this.initialPixelsPerUnit = this.pixelsPerUnit;
     }
 
     public void redraw(){
@@ -255,9 +269,23 @@ public class DiagramView extends SurfaceView {
             pts[i] = value += linesLength;
         }
 
+        double position = 0;
+        float pixelPosition;
+        if(this.max.real < position)
+            position = this.max.real;
+        if(this.min.real > position)
+            position = this.min.real;
+
+        pixelPosition = getX(position);
+        // put the text left of the axis line if there is not enough place right.
+        if(pixelPosition + textPaint.getTextSize()*(order + 1) > getX(this.max))
+            textPaint.setTextAlign(Paint.Align.RIGHT);
+        else
+            textPaint.setTextAlign(Paint.Align.LEFT);
+
         for(; imaginary <= this.max.imaginary; imaginary += step) {
             value = getY(imaginary);
-            canvas.drawText(Float.toString(imaginary).replaceAll("\\.?0*$", ""), getX(0) + 12, value + textPaint.getTextSize(), textPaint);
+            canvas.drawText(Float.toString(imaginary).replaceAll("\\.?0*$", ""), pixelPosition, value, textPaint);
             for(int i = 1; i < pts.length; i += 2){
                 pts[i] = value;
             }
@@ -294,9 +322,24 @@ public class DiagramView extends SurfaceView {
             pts[i] = value += linesLength;
         }
 
+        double imaginaryPosition = 0;
+        float pixelPosition;
+        if(this.min.imaginary > imaginaryPosition){
+            imaginaryPosition = this.min.imaginary;
+        }
+        else {
+            if (this.max.imaginary < imaginaryPosition)
+                imaginaryPosition = this.max.imaginary;
+        }
+        pixelPosition = getY(imaginaryPosition);
+        // put the text above the axis line if there is not enough place below.
+        if(pixelPosition - textPaint.getTextSize() < PIXELS_TOP_PADDING)
+            pixelPosition += textPaint.getTextSize();
+        textPaint.setTextAlign(Paint.Align.LEFT);
+
         for(; real <= this.max.real; real += step){
             value = getX(real);
-            canvas.drawText(Float.toString(real).replaceAll("\\.?0*$", ""), value + 12, getY(0) + textPaint.getTextSize(), textPaint);
+            canvas.drawText(Float.toString(real).replaceAll("\\.?0*$", ""), value, pixelPosition, textPaint);
             for(int i = 0; i < pts.length; i += 2){
                 pts[i] = value;
             }
@@ -305,15 +348,37 @@ public class DiagramView extends SurfaceView {
     }
 
     private void drawAxis(Canvas canvas) {
-        canvas.drawLine(getX(this.min), getY(0), getX(this.max), getY(0), this.axisPaint);
-        canvas.drawLine(getX(0), getY(this.max), getX(0), getY(this.min), this.axisPaint);
+        double position = 0;
+        if(this.max.imaginary < position)
+            position = this.max.imaginary;
+        if(this.min.imaginary > position)
+            position = this.min.imaginary;
+        canvas.drawLine(getX(this.min), getY(position),
+                getX(this.max), getY(position),
+                this.axisPaint);
+        position = 0;
+        if(this.max.real < position)
+            position = this.max.real;
+        if(this.min.real > position)
+            position = this.min.real;
+        canvas.drawLine(getX(position), getY(this.max),
+                getX(position), getY(this.min),
+                this.axisPaint);
     }
 
     private void cover(Canvas canvas){
-        canvas.drawRect(0, 0, PIXELS_LEFT_PADDING, getY(min), this.backgroundPaint);
-        canvas.drawRect(0, 0, getX(max), PIXELS_TOP_PADDING, this.backgroundPaint);
-        canvas.drawRect(0, getY(min), getX(max) + PIXELS_RIGHT_PADDING, getY(min) + PIXELS_BOTTOM_PADDING, this.backgroundPaint);
-        canvas.drawRect(getX(max), 0, this.getLayoutParams().width, this.getLayoutParams().height, this.backgroundPaint);
+        canvas.drawRect(0, 0,
+                PIXELS_LEFT_PADDING, getY(min),
+                this.backgroundPaint);
+        canvas.drawRect(0, 0,
+                getX(max), PIXELS_TOP_PADDING,
+                this.backgroundPaint);
+        canvas.drawRect(0, getY(min),
+                getX(max) + PIXELS_RIGHT_PADDING, getY(min) + PIXELS_BOTTOM_PADDING,
+                this.backgroundPaint);
+        canvas.drawRect(getX(max), 0,
+                this.getLayoutParams().width, this.getLayoutParams().height,
+                this.backgroundPaint);
     }
 
     private void drawCurve(Canvas canvas, Complex64F zero, Complex64F[] values, Complex64F infinite){
@@ -386,5 +451,103 @@ public class DiagramView extends SurfaceView {
             max.imaginary = value.imaginary;
         if (value.imaginary < min.imaginary)
             min.imaginary = value.imaginary;
+    }
+
+    @Override
+    public boolean onTouchEvent(@NonNull MotionEvent event) {
+        // prevent parent groupView from scrolling
+        this.getParent().requestDisallowInterceptTouchEvent(true);
+
+        // first check for scaling
+        this.scaleDetector.onTouchEvent(event);
+
+        // if scaling is in progress (event is consumed) do not do other things.
+        if(this.scaleDetector.isInProgress())
+            return true;
+
+        // if there is no scaling handle scrolling
+        this.scrollDetector.onTouchEvent(event);
+
+        // always consume the event
+        return true;
+    }
+
+    public void move(Complex64F offset){
+        this.max.real = this.max.real + offset.real;
+        this.max.imaginary = this.max.imaginary + offset.imaginary;
+        this.min.real = this.min.real + offset.real;
+        this.min.imaginary = this.min.imaginary + offset.imaginary;
+        redraw();
+    }
+
+    public void zoom(double zoomFactor, Complex64F focus){
+        if(zoomFactor <= 0)
+            return;
+        this.max.real = focus.real + zoomFactor * (this.max.real - focus.real);
+        this.max.imaginary = focus.imaginary + zoomFactor * (this.max.imaginary - focus.imaginary);
+        this.min.real = focus.real + zoomFactor * (this.min.real - focus.real);
+        this.min.imaginary = focus.imaginary + zoomFactor * (this.min.imaginary - focus.imaginary);
+        this.pixelsPerUnit /= zoomFactor;
+        redraw();
+    }
+
+    public void reset(){
+        this.max.real = this.initialMax.real;
+        this.max.imaginary = this.initialMax.imaginary;
+        this.min.real = this.initialMin.real;
+        this.min.imaginary = this.initialMin.imaginary;
+        this.pixelsPerUnit = this.initialPixelsPerUnit;
+        redraw();
+    }
+
+    private class MyScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
+        @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+            // Don't scale if the change is less than 2%
+            if(Math.abs(detector.getScaleFactor() - 1) < 0.02)
+                return false;
+
+            // Calculate focus point in pixels without padding
+            double focusX = detector.getFocusX() - PIXELS_LEFT_PADDING;
+            double focusY = detector.getFocusY() - PIXELS_TOP_PADDING;
+            // Calculate focus point relative to size of displayed diagram
+            focusX /= getWidth() - PIXELS_RIGHT_PADDING - PIXELS_LEFT_PADDING;
+            focusY /= getHeight() - PIXELS_TOP_PADDING - PIXELS_BOTTOM_PADDING;
+            // Calculate focus point in displayed units
+            focusX = DiagramView.this.min.real +
+                    focusX * (DiagramView.this.max.real - DiagramView.this.min.real);
+            focusY = DiagramView.this.min.imaginary +
+                    focusY * (DiagramView.this.max.imaginary - DiagramView.this.min.imaginary);
+
+            DiagramView.this.zoom(detector.getScaleFactor(), new Complex64F(focusX, focusY));
+            return true;
+        }
+    }
+
+    private class MyScrollListener extends GestureDetector.SimpleOnGestureListener {
+
+        @Override
+        public boolean onDoubleTap(MotionEvent e){
+            DiagramView.this.reset();
+            return true;
+        }
+
+        @Override
+        public boolean onScroll(MotionEvent e1, MotionEvent e2,float distanceX, float distanceY){
+            // Calculate offset relative to size of displayed diagram
+            double offsetX = distanceX / (getWidth() - PIXELS_RIGHT_PADDING - PIXELS_LEFT_PADDING);
+            double offsetY = - distanceY / (getHeight() - PIXELS_TOP_PADDING - PIXELS_BOTTOM_PADDING);
+
+            // Don't scale if the change is less than 2%
+//            if((offsetX*offsetX + offsetY*offsetY) < 0.02*0.02)
+//                return false;
+
+            // Calculate offset in displayed units
+            offsetX = offsetX * (DiagramView.this.max.real - DiagramView.this.min.real);
+            offsetY = offsetY * (DiagramView.this.max.imaginary - DiagramView.this.min.imaginary);
+
+            DiagramView.this.move(new Complex64F(offsetX, offsetY));
+            return true;
+        }
     }
 }
