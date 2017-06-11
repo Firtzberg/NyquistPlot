@@ -6,6 +6,8 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.os.Bundle;
+import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -41,6 +43,14 @@ public class DiagramView extends SurfaceView {
     private static final double FREQUENCY_DENSITY = 20;
     private static final double FREQUENCY_LOG_EXPANSION = 1.0;
     private static final double MAX_DIAGRAM_RATIO = 2.0;
+    public static final String PARCELABLE_MAX_KEY = "max";
+    public static final String PARCELABLE_MIN_KEY = "min";
+    public static final String PARCELABLE_REAL_KEY = "real";
+    public static final String PARCELABLE_IMAGINARY_KEY = "imaginary";
+    public static final String PARCELABLE_PIXEL_PER_UNIT_KEY = "ppu";
+    public static final String PARCELABLE_INITIAL_MAX_KEY = "imax";
+    public static final String PARCELABLE_INITIAL_MIN_KEY = "imin";
+    public static final String PARCELABLE_INITIAL_PIXEL_PER_UNIT_KEY = "ippu";
     private float pixelsPerUnit;
     private Complex64F min;
     private Complex64F max;
@@ -549,5 +559,51 @@ public class DiagramView extends SurfaceView {
             DiagramView.this.move(new Complex64F(offsetX, offsetY));
             return true;
         }
+    }
+
+    private Parcelable saveComplex64F(Complex64F complex){
+        Bundle bundle = new Bundle();
+        bundle.putDouble(PARCELABLE_REAL_KEY, complex.real);
+        bundle.putDouble(PARCELABLE_IMAGINARY_KEY, complex.imaginary);
+        return bundle;
+    }
+
+    private Complex64F restoreComplex64F(Parcelable state){
+        Complex64F complex = null;
+        if (state instanceof Bundle) {
+            Bundle bundle = (Bundle) state;
+            complex = new Complex64F(bundle.getDouble(PARCELABLE_REAL_KEY),
+                    bundle.getDouble(PARCELABLE_IMAGINARY_KEY));
+        }
+        return complex;
+    }
+
+    @Override
+    public Parcelable onSaveInstanceState() {
+        Bundle bundle = new Bundle();
+        bundle.putParcelable("instanceState", super.onSaveInstanceState());
+        bundle.putFloat(PARCELABLE_PIXEL_PER_UNIT_KEY, this.pixelsPerUnit);
+        bundle.putParcelable(PARCELABLE_MAX_KEY, saveComplex64F(this.max));
+        bundle.putParcelable(PARCELABLE_MIN_KEY, saveComplex64F(this.min));
+        bundle.putFloat(PARCELABLE_INITIAL_PIXEL_PER_UNIT_KEY, this.initialPixelsPerUnit);
+        bundle.putParcelable(PARCELABLE_INITIAL_MAX_KEY, saveComplex64F(this.initialMax));
+        bundle.putParcelable(PARCELABLE_INITIAL_MIN_KEY, saveComplex64F(this.initialMin));
+        return bundle;
+    }
+
+    @Override
+    public void onRestoreInstanceState(Parcelable state) {
+        if (state instanceof Bundle) {
+            Bundle bundle = (Bundle) state;
+            this.pixelsPerUnit = bundle.getFloat(PARCELABLE_PIXEL_PER_UNIT_KEY);
+            this.max = restoreComplex64F(bundle.getParcelable(PARCELABLE_MAX_KEY));
+            this.min = restoreComplex64F(bundle.getParcelable(PARCELABLE_MIN_KEY));
+            this.initialPixelsPerUnit = bundle.getFloat(PARCELABLE_INITIAL_PIXEL_PER_UNIT_KEY);
+            this.initialMax = restoreComplex64F(bundle.getParcelable(PARCELABLE_INITIAL_MAX_KEY));
+            this.initialMin = restoreComplex64F(bundle.getParcelable(PARCELABLE_INITIAL_MIN_KEY));
+            state = bundle.getParcelable("instanceState");
+        }
+        if(state != null)
+            super.onRestoreInstanceState(state);
     }
 }

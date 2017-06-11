@@ -21,6 +21,7 @@ import fr.nicolaspomepuy.discreetapprate.RetryPolicy;
 
 public class ResultActivity extends Activity {
     public static final String PARCELABLE_ORIGINAL_TF = "originalTF";
+    public static final String PARCELABLE_DIAGRAM = "diagram";
     private static final double FREQUENCY_DENSITY = 20;
     private static final double FREQUENCY_LOG_EXPANSION = 1.0;
     protected TransferFunctionView originalTransferFunction;
@@ -307,11 +308,13 @@ public class ResultActivity extends Activity {
     public void onSaveInstanceState(Bundle savedInstanceState) {
         super.onSaveInstanceState(savedInstanceState);
         savedInstanceState.putParcelable(PARCELABLE_ORIGINAL_TF, this.originalTransferFunction.onSaveInstanceState());
+        savedInstanceState.putParcelable(PARCELABLE_DIAGRAM, this.diagram.onSaveInstanceState());
     }
 
     @Override
     public void onRestoreInstanceState(Bundle savedInstanceState) {
         super.onRestoreInstanceState(savedInstanceState);
         this.originalTransferFunction.onRestoreInstanceState(savedInstanceState.getParcelable(PARCELABLE_ORIGINAL_TF));
+        this.diagram.onRestoreInstanceState(savedInstanceState.getParcelable(PARCELABLE_DIAGRAM));
     }
 }
