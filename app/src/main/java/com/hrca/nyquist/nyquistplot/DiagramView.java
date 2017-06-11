@@ -41,6 +41,7 @@ public class DiagramView extends SurfaceView implements SurfaceHolder.Callback {
     private static final float RELATIVE_CURVE_THICKNESS = 1.5F;
     private static final double FREQUENCY_DENSITY = 20;
     private static final double FREQUENCY_LOG_EXPANSION = 1.0;
+    private static final float ADDITIONAL_SPACE_RATIO = 0.05F;
     public static final String PARCELABLE_MAX_KEY = "max";
     public static final String PARCELABLE_MIN_KEY = "min";
     public static final String PARCELABLE_REAL_KEY = "real";
@@ -157,10 +158,10 @@ public class DiagramView extends SurfaceView implements SurfaceHolder.Callback {
             defaultMax.imaginary = -defaultMin.imaginary;
 
         // give a bit space
-        double space = 0.05F*(defaultMax.real - defaultMin.real);
+        double space = ADDITIONAL_SPACE_RATIO*(defaultMax.real - defaultMin.real);
         defaultMax.real += space;
         defaultMin.real -= space;
-        space = 0.05F*(defaultMax.imaginary - defaultMin.imaginary);
+        space = ADDITIONAL_SPACE_RATIO*(defaultMax.imaginary - defaultMin.imaginary);
         defaultMax.imaginary += space;
         defaultMin.imaginary -= space;
 
@@ -509,11 +510,33 @@ public class DiagramView extends SurfaceView implements SurfaceHolder.Callback {
     }
 
     public void reset(){
+        boolean isOverview = false;
+        if((float)this.max.real == (float)this.defaultMax.real &&
+                (float)this.min.real == (float)this.defaultMin.real)
+            isOverview = true;
+        if((float)this.max.imaginary == (float)this.defaultMax.imaginary &&
+                (float)this.min.imaginary == (float)this.defaultMin.imaginary)
+            isOverview = true;
+
         // forget previous frame location
         this.max = null;
         this.min = null;
-        // recalculate frame location
-        surfaceChanged(this.getHolder(), 0, this.getWidth(), this.getHeight());
+
+        if (!isOverview){
+            // recalculate frame location
+            surfaceChanged(this.getHolder(), 0, this.getWidth(), this.getHeight());
+        }
+        else{
+            // zoom to unit circle
+            Complex64F maxHolder = this.defaultMax;
+            Complex64F minHolder = this.defaultMin;
+            this.defaultMax = new Complex64F(1+ADDITIONAL_SPACE_RATIO,1+ADDITIONAL_SPACE_RATIO);
+            this.defaultMin = new Complex64F(-1-ADDITIONAL_SPACE_RATIO,-1-ADDITIONAL_SPACE_RATIO);
+            // recalculate frame location
+            surfaceChanged(this.getHolder(), 0, this.getWidth(), this.getHeight());
+            this.defaultMax = maxHolder;
+            this.defaultMin = minHolder;
+        }
     }
 
     private class MyScaleListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
