@@ -29,6 +29,6 @@
         <attr name="curve_color" format="color" />
         <attr name="secondary_curve_color" format="color" />
         <attr name="unit_circle_color" format="color" />
-        <attr name="size_text" format="float" />
+        <attr name="size_text" format="dimension" />
     </declare-styleable>
 </resources>
