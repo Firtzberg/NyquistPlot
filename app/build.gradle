@@ -8,8 +8,8 @@ android {
         applicationId "com.hrca.nyquist.nyquistplot"
         minSdkVersion 8
         targetSdkVersion 21
-        versionCode 6
-        versionName "1.5"
+        versionCode 8
+        versionName "2.1"
     }
     buildTypes {
         release {
