@@ -555,7 +555,7 @@ public class DiagramView extends SurfaceView implements SurfaceHolder.Callback {
             // Calculate focus point in displayed units
             focusX = DiagramView.this.min.real +
                     focusX * (DiagramView.this.max.real - DiagramView.this.min.real);
-            focusY = DiagramView.this.min.imaginary +
+            focusY = DiagramView.this.max.imaginary -
                     focusY * (DiagramView.this.max.imaginary - DiagramView.this.min.imaginary);
 
             DiagramView.this.zoom(1/detector.getScaleFactor(), new Complex64F(focusX, focusY));
