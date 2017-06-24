@@ -10,12 +10,14 @@ import android.os.Bundle;
 import android.os.Parcelable;
 import android.support.annotation.NonNull;
 import android.util.AttributeSet;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
+import android.view.WindowManager;
 
 import org.ejml.data.Complex64F;
 
@@ -469,6 +471,17 @@ public class DiagramView extends SurfaceView implements SurfaceHolder.Callback {
             defaultMax.imaginary = value.imaginary;
         if (value.imaginary < defaultMin.imaginary)
             defaultMin.imaginary = value.imaginary;
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        // Set the height of the view to the height of the activity without margins
+        DisplayMetrics outMetrics = new DisplayMetrics();
+        ((WindowManager) this.getContext().getSystemService(Context.WINDOW_SERVICE))
+                .getDefaultDisplay().getMetrics(outMetrics);
+        int margins = 2*getResources().getDimensionPixelSize(R.dimen.activity_vertical_margin);
+        setMeasuredDimension(getMeasuredWidth(), outMetrics.heightPixels - margins);
     }
 
     @Override
